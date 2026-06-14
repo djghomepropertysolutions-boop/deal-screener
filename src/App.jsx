@@ -1,25 +1,25 @@
 import { useState, useEffect, useRef, useMemo, Component } from "react";
 
 // ── Brand Colors ──────────────────────────────────────────────────────────────
-const TEAL     = "#1B3A4B";
-const TEAL_L   = "#2A5A6E";
-const GOLD     = "#D4A843";
-const GOLD_L   = "#F0D48A";
-const BG       = "#F0F4F8";
+const TEAL     = "#7C3AED";   // Bold Purple (primary)
+const TEAL_L   = "#8B5CF6";
+const GOLD     = "#FF5757";   // Vibrant Coral (accent)
+const GOLD_L   = "#FF8A8A";
+const BG       = "#F8F7FF";   // Soft lavender white
 const WHITE    = "#FFFFFF";
-const TEXT     = "#1A2332";
-const TEXT2    = "#5A6777";
-const GREEN    = "#2D9F6F";
-const AMBER    = "#E8923F";
-const RED      = "#D94B4B";
-const BLUE     = "#3B82C4";
+const TEXT     = "#1E1B4B";   // Deep indigo text
+const TEXT2    = "#6B7280";
+const GREEN    = "#10B981";   // Emerald
+const AMBER    = "#F59E0B";   // Bright Amber
+const RED      = "#EF4444";   // Vivid Red
+const BLUE     = "#3B82F6";   // Electric Blue
 
 // ── Lane Config ───────────────────────────────────────────────────────────────
 const LANES = {
-  investor:  { label: "Investor Match",    icon: "🔨", color: AMBER,  short: "Inv" },
-  fha:       { label: "First-Time Buyer",  icon: "🏠", color: GREEN,  short: "FHA" },
-  moveup:    { label: "Move-Up Buyer",     icon: "⬆️", color: BLUE,   short: "Move" },
-  listing:   { label: "Listing Lead",      icon: "📋", color: "#8B5CF6", short: "List" },
+  investor:  { label: "Investor Match",    icon: "🔨", color: "#F97316",  short: "Inv" },
+  fha:       { label: "First-Time Buyer",  icon: "🏠", color: "#10B981",  short: "FHA" },
+  moveup:    { label: "Move-Up Buyer",     icon: "⬆️", color: "#3B82F6",  short: "Move" },
+  listing:   { label: "Listing Lead",      icon: "📋", color: "#EC4899", short: "List" },
 };
 
 // ── Status System (replaces "Tiers") ──────────────────────────────────────────
@@ -286,12 +286,12 @@ function generateDealBrief(listing, agentInfo) {
 // ── Shared Styles ─────────────────────────────────────────────────────────────
 const S = {
   app:     { fontFamily: "Georgia,'Times New Roman',serif", background: BG, minHeight: "100vh", color: TEXT },
-  card:    { background: WHITE, borderRadius: 10, padding: "18px 20px", marginBottom: 14, boxShadow: "0 2px 8px rgba(27,58,75,0.08)" },
-  label:   { display: "block", fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 },
-  input:   { width: "100%", padding: "9px 12px", borderRadius: 6, border: "1.5px solid #CBD5E1", fontSize: 13, fontFamily: "Georgia,serif", color: TEXT, boxSizing: "border-box", outline: "none" },
-  btn:     (bg, fg="#fff") => ({ background: bg, color: fg, border: "none", borderRadius: 7, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Georgia,serif" }),
-  tag:     (c) => ({ display: "inline-block", background: c + "18", color: c, border: `1px solid ${c}44`, borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 700, marginRight: 4 }),
-  badge:   (c) => ({ display: "inline-block", background: c, color: WHITE, borderRadius: 12, padding: "2px 10px", fontSize: 11, fontWeight: 700 }),
+  card:    { background: WHITE, borderRadius: 12, padding: "22px 24px", marginBottom: 16, boxShadow: "0 4px 14px rgba(124,58,237,0.08)" },
+  label:   { display: "block", fontSize: 13, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 },
+  input:   { width: "100%", padding: "12px 14px", borderRadius: 8, border: "2px solid #D8D4F2", fontSize: 15, fontFamily: "Georgia,serif", color: TEXT, boxSizing: "border-box", outline: "none" },
+  btn:     (bg, fg="#fff") => ({ background: bg, color: fg, border: "none", borderRadius: 8, padding: "12px 24px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "Georgia,serif" }),
+  tag:     (c) => ({ display: "inline-block", background: c + "18", color: c, border: `1px solid ${c}44`, borderRadius: 6, padding: "4px 12px", fontSize: 13, fontWeight: 700, marginRight: 6 }),
+  badge:   (c) => ({ display: "inline-block", background: c, color: WHITE, borderRadius: 14, padding: "4px 14px", fontSize: 13, fontWeight: 700 }),
 };
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
@@ -397,16 +397,16 @@ function ListingCard({ listing, sentLog, onSend, lane }) {
     <div style={{ ...S.card, borderLeft: `4px solid ${LANES[lane]?.color || TEAL}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>{listing.address || "No Address"}</div>
-          <div style={{ fontSize: 12, color: TEXT2 }}>{listing.city}, {listing.state} {listing.zip}</div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: TEXT }}>{listing.address || "No Address"}</div>
+          <div style={{ fontSize: 14, color: TEXT2 }}>{listing.city}, {listing.state} {listing.zip}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontWeight: 800, fontSize: 17, color: TEAL }}>{fmtPrice(listing.price)}</div>
-          {listing.priceReduced && <div style={{ fontSize: 11, color: RED, fontWeight: 600 }}>↓ {listing.priceDropPct}% reduced</div>}
+          <div style={{ fontWeight: 800, fontSize: 20, color: TEAL }}>{fmtPrice(listing.price)}</div>
+          {listing.priceReduced && <div style={{ fontSize: 13, color: RED, fontWeight: 600 }}>↓ {listing.priceDropPct}% reduced</div>}
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 16, fontSize: 12, color: TEXT2, marginBottom: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 18, fontSize: 14, color: TEXT2, marginBottom: 10, flexWrap: "wrap" }}>
         <span>{listing.beds} bed / {listing.baths} bath</span>
         {listing.sqft > 0 && <span>{listing.sqft.toLocaleString()} sqft</span>}
         {listing.yearBuilt > 0 && <span>Built {listing.yearBuilt}</span>}
@@ -423,14 +423,14 @@ function ListingCard({ listing, sentLog, onSend, lane }) {
 
       {/* Investor Matches */}
       {listing._investorMatches && listing._investorMatches.length > 0 && (
-        <div style={{ fontSize: 12, color: TEAL, fontWeight: 600, marginBottom: 6 }}>
+        <div style={{ fontSize: 14, color: TEAL, fontWeight: 600, marginBottom: 8 }}>
           Matches: {listing._investorMatches.join(", ")}
         </div>
       )}
 
       {/* Notes */}
       {listing.notes && listing.notes.length > 0 && (
-        <div style={{ fontSize: 11, color: TEXT2, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, color: TEXT2, marginBottom: 10 }}>
           {listing.notes.map((n, i) => <div key={i}>• {n}</div>)}
         </div>
       )}
@@ -560,7 +560,7 @@ function RosterManager({ roster, setRoster, addToast }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 16, color: TEAL }}>Your Roster ({roster.length})</div>
+        <div style={{ fontWeight: 700, fontSize: 20, color: TEAL }}>Your Roster ({roster.length})</div>
         <button onClick={() => setShowForm(!showForm)} style={S.btn(TEAL)}>{showForm ? "Cancel" : "+ Add Contact"}</button>
       </div>
 
@@ -600,9 +600,9 @@ function RosterManager({ roster, setRoster, addToast }) {
         roster.map((r, i) => (
           <div key={i} style={{ ...S.card, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: TEXT }}>{r.Name}</div>
-              <div style={{ fontSize: 12, color: TEXT2 }}>{r.Email} {r.Phone ? `· ${r.Phone}` : ""}</div>
-              <div style={{ fontSize: 11, color: TEXT2, marginTop: 2 }}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: TEXT }}>{r.Name}</div>
+              <div style={{ fontSize: 14, color: TEXT2 }}>{r.Email} {r.Phone ? `· ${r.Phone}` : ""}</div>
+              <div style={{ fontSize: 13, color: TEXT2, marginTop: 4 }}>
                 {r.Strategy !== "Any" ? r.Strategy + " · " : ""}
                 {r.PriceMin && r.PriceMax ? `$${parseInt(r.PriceMin).toLocaleString()}–$${parseInt(r.PriceMax).toLocaleString()}` : ""}
                 {r.BedsMin && parseInt(r.BedsMin) > 0 ? ` · ${r.BedsMin}+ beds` : ""}
@@ -768,51 +768,51 @@ function DealScreener() {
   return (
     <div style={S.app}>
       {/* ── Header ── */}
-      <div style={{ background: TEAL, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
+      <div style={{ background: `linear-gradient(135deg, ${TEAL}, #9333EA)`, padding: "18px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: GOLD, letterSpacing: 0.5 }}>Deal Screener</div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: 1.5 }}>THE REAL ESTATE DOC</div>
+          <div style={{ fontWeight: 700, fontSize: 22, color: WHITE, letterSpacing: 0.5 }}>Deal Screener</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", letterSpacing: 2 }}>THE REAL ESTATE DOC</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {screened.length > 0 && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)" }}>{screened.length} listings</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {screened.length > 0 && <span style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>{screened.length} listings</span>}
           <input ref={fileRef} type="file" accept=".csv" onChange={handleFileUpload} style={{ display: "none" }} />
-          <button onClick={() => fileRef.current?.click()} style={{ ...S.btn(GOLD, TEAL), fontSize: 12, padding: "8px 16px" }}>
+          <button onClick={() => fileRef.current?.click()} style={{ ...S.btn(GOLD, WHITE), fontSize: 15, padding: "10px 22px", borderRadius: 10 }}>
             {loading ? "Loading..." : "📁 Upload CSV"}
           </button>
         </div>
       </div>
 
       {/* ── Tab Bar ── */}
-      <div style={{ background: WHITE, borderBottom: "1px solid #E2E8F0", display: "flex", overflowX: "auto", padding: "0 8px" }}>
+      <div style={{ background: WHITE, borderBottom: "2px solid #E5E1F5", display: "flex", overflowX: "auto", padding: "0 12px" }}>
         {TABS.filter(t => t.show).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ background: "none", border: "none", borderBottom: tab === t.id ? `3px solid ${TEAL}` : "3px solid transparent", padding: "10px 14px", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, color: tab === t.id ? TEAL : TEXT2, cursor: "pointer", fontFamily: "Georgia,serif", whiteSpace: "nowrap" }}>
+            style={{ background: "none", border: "none", borderBottom: tab === t.id ? `3px solid ${TEAL}` : "3px solid transparent", padding: "14px 18px", fontSize: 15, fontWeight: tab === t.id ? 700 : 400, color: tab === t.id ? TEAL : TEXT2, cursor: "pointer", fontFamily: "Georgia,serif", whiteSpace: "nowrap" }}>
             {t.icon} {t.label}
           </button>
         ))}
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: "16px 16px 80px", maxWidth: 800, margin: "0 auto" }}>
+      <div style={{ padding: "24px 24px 80px", maxWidth: 900, margin: "0 auto" }}>
 
         {/* ── HOME TAB ── */}
         {tab === "home" && (
           <div>
             {screened.length === 0 ? (
-              <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>📁</div>
-                <div style={{ fontWeight: 700, fontSize: 18, color: TEAL, marginBottom: 8 }}>Upload Your MLS Export</div>
-                <div style={{ fontSize: 13, color: TEXT2, marginBottom: 20, lineHeight: 1.6 }}>
+              <div style={{ ...S.card, textAlign: "center", padding: 50 }}>
+                <div style={{ fontSize: 64, marginBottom: 20 }}>📁</div>
+                <div style={{ fontWeight: 700, fontSize: 24, color: TEAL, marginBottom: 10 }}>Upload Your MLS Export</div>
+                <div style={{ fontSize: 16, color: TEXT2, marginBottom: 24, lineHeight: 1.7 }}>
                   Export an Agent Single Line CSV from Matrix with Active listings.
                   The screener will sort every listing into 4 lanes and surface your best opportunities.
                 </div>
-                <button onClick={() => fileRef.current?.click()} style={{ ...S.btn(GOLD, TEAL), fontSize: 14, padding: "12px 28px" }}>
+                <button onClick={() => fileRef.current?.click()} style={{ ...S.btn(GOLD, WHITE), fontSize: 17, padding: "14px 36px", borderRadius: 10 }}>
                   📁 Upload CSV
                 </button>
-                <div style={{ marginTop: 24, textAlign: "left" }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: TEAL, marginBottom: 10 }}>Your 4 Screening Lanes</div>
+                <div style={{ marginTop: 28, textAlign: "left" }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: TEAL, marginBottom: 12 }}>Your 4 Screening Lanes</div>
                   {Object.entries(LANES).map(([k, v]) => (
-                    <div key={k} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, fontSize: 13 }}>
+                    <div key={k} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, fontSize: 15 }}>
                       <span style={S.badge(v.color)}>{v.icon} {v.label}</span>
                     </div>
                   ))}
@@ -821,18 +821,18 @@ function DealScreener() {
             ) : (
               <div>
                 {/* Dashboard Summary */}
-                <div style={{ ...S.card, background: TEAL, color: WHITE }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: GOLD, marginBottom: 12 }}>Screening Results</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                <div style={{ ...S.card, background: `linear-gradient(135deg, ${TEAL}, #9333EA)`, color: WHITE }}>
+                  <div style={{ fontWeight: 700, fontSize: 20, color: WHITE, marginBottom: 16 }}>Screening Results</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                     {Object.entries(LANES).map(([k, v]) => (
                       <div key={k} onClick={() => { setTab("results"); setLaneFilter(k); }}
-                        style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "12px 10px", textAlign: "center", cursor: "pointer", border: `1px solid ${v.color}44` }}>
-                        <div style={{ fontSize: 24, fontWeight: 800, color: v.color }}>{counts[k]}</div>
-                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>{v.icon} {v.short}</div>
+                        style={{ background: "rgba(255,255,255,0.12)", borderRadius: 10, padding: "16px 12px", textAlign: "center", cursor: "pointer", border: `2px solid ${v.color}55` }}>
+                        <div style={{ fontSize: 32, fontWeight: 800, color: v.color }}>{counts[k]}</div>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 4 }}>{v.icon} {v.short}</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                  <div style={{ marginTop: 12, fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
                     {counts.unflagged} listings did not match any lane · {screened.length} total loaded
                   </div>
                 </div>
@@ -840,7 +840,7 @@ function DealScreener() {
                 {/* Top Picks */}
                 {topPicks.length > 0 && (
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: TEAL, marginBottom: 10, marginTop: 6 }}>⭐ Top Picks</div>
+                    <div style={{ fontWeight: 700, fontSize: 20, color: TEAL, marginBottom: 12, marginTop: 8 }}>⭐ Top Picks</div>
                     {topPicks.map((l, i) => (
                       <ListingCard key={l.mls + i} listing={l} sentLog={sentLog} onSend={setSendModal} lane={l.flags[0]} />
                     ))}
@@ -855,19 +855,19 @@ function DealScreener() {
         {tab === "results" && (
           <div>
             {/* Lane Filter Buttons */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
               <button onClick={() => setLaneFilter("all")}
-                style={{ ...S.btn(laneFilter === "all" ? TEAL : "#E2E8F0", laneFilter === "all" ? WHITE : TEXT2), fontSize: 12, padding: "6px 14px" }}>
+                style={{ ...S.btn(laneFilter === "all" ? TEAL : "#E5E1F5", laneFilter === "all" ? WHITE : TEXT2), fontSize: 14, padding: "8px 18px" }}>
                 All ({counts.all})
               </button>
               {Object.entries(LANES).map(([k, v]) => (
                 <button key={k} onClick={() => setLaneFilter(k)}
-                  style={{ ...S.btn(laneFilter === k ? v.color : "#E2E8F0", laneFilter === k ? WHITE : TEXT2), fontSize: 12, padding: "6px 14px" }}>
+                  style={{ ...S.btn(laneFilter === k ? v.color : "#E5E1F5", laneFilter === k ? WHITE : TEXT2), fontSize: 14, padding: "8px 18px" }}>
                   {v.icon} {v.short} ({counts[k]})
                 </button>
               ))}
               <button onClick={() => setLaneFilter("unflagged")}
-                style={{ ...S.btn(laneFilter === "unflagged" ? "#94A3B8" : "#E2E8F0", laneFilter === "unflagged" ? WHITE : TEXT2), fontSize: 12, padding: "6px 14px" }}>
+                style={{ ...S.btn(laneFilter === "unflagged" ? "#94A3B8" : "#E5E1F5", laneFilter === "unflagged" ? WHITE : TEXT2), fontSize: 14, padding: "8px 18px" }}>
                 No Match ({counts.unflagged})
               </button>
             </div>
@@ -890,14 +890,14 @@ function DealScreener() {
         {/* ── SEND LOG TAB ── */}
         {tab === "log" && (
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: TEAL, marginBottom: 14 }}>Send Log</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: TEAL, marginBottom: 16 }}>Send Log</div>
             {Object.keys(sentLog).length === 0 ? (
-              <div style={{ ...S.card, textAlign: "center", color: TEXT2 }}>No deals sent yet. Upload a CSV, find a match, and send your first deal brief.</div>
+              <div style={{ ...S.card, textAlign: "center", color: TEXT2, fontSize: 15 }}>No deals sent yet. Upload a CSV, find a match, and send your first deal brief.</div>
             ) : (
               Object.entries(sentLog).map(([mls, recipients]) => (
                 <div key={mls} style={S.card}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: TEXT }}>MLS# {mls}</div>
-                  <div style={{ fontSize: 12, color: TEXT2 }}>Sent to: {Array.isArray(recipients) ? recipients.join(", ") : recipients}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>MLS# {mls}</div>
+                  <div style={{ fontSize: 14, color: TEXT2 }}>Sent to: {Array.isArray(recipients) ? recipients.join(", ") : recipients}</div>
                 </div>
               ))
             )}
@@ -907,10 +907,10 @@ function DealScreener() {
         {/* ── SETTINGS TAB ── */}
         {tab === "settings" && (
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: TEAL, marginBottom: 14 }}>Screening Settings</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: TEAL, marginBottom: 16 }}>Screening Settings</div>
 
             <div style={S.card}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: TEAL, marginBottom: 12 }}>🔨 Investor Lane</div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: TEAL, marginBottom: 14 }}>🔨 Investor Lane</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><label style={S.label}>Max Price</label><input style={S.input} type="number" value={thresholds.investorMaxPrice} onChange={e => setThresholds({ ...thresholds, investorMaxPrice: parseInt(e.target.value) || 0 })} /></div>
                 <div><label style={S.label}>Min Beds</label><input style={S.input} type="number" value={thresholds.investorMinBeds} onChange={e => setThresholds({ ...thresholds, investorMinBeds: parseInt(e.target.value) || 0 })} /></div>
@@ -919,7 +919,7 @@ function DealScreener() {
             </div>
 
             <div style={S.card}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: TEAL, marginBottom: 12 }}>🏠 First-Time Buyer Lane</div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: TEAL, marginBottom: 14 }}>🏠 First-Time Buyer Lane</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><label style={S.label}>Min Price</label><input style={S.input} type="number" value={thresholds.fhaMinPrice} onChange={e => setThresholds({ ...thresholds, fhaMinPrice: parseInt(e.target.value) || 0 })} /></div>
                 <div><label style={S.label}>Max Price</label><input style={S.input} type="number" value={thresholds.fhaMaxPrice} onChange={e => setThresholds({ ...thresholds, fhaMaxPrice: parseInt(e.target.value) || 0 })} /></div>
@@ -928,7 +928,7 @@ function DealScreener() {
             </div>
 
             <div style={S.card}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: TEAL, marginBottom: 12 }}>⬆️ Move-Up Buyer Lane</div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: TEAL, marginBottom: 14 }}>⬆️ Move-Up Buyer Lane</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><label style={S.label}>Min Price</label><input style={S.input} type="number" value={thresholds.moveupMinPrice} onChange={e => setThresholds({ ...thresholds, moveupMinPrice: parseInt(e.target.value) || 0 })} /></div>
                 <div><label style={S.label}>Max Price</label><input style={S.input} type="number" value={thresholds.moveupMaxPrice} onChange={e => setThresholds({ ...thresholds, moveupMaxPrice: parseInt(e.target.value) || 0 })} /></div>
@@ -942,13 +942,13 @@ function DealScreener() {
             </div>
 
             <div style={S.card}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: TEAL, marginBottom: 12 }}>📋 Listing Lead Lane</div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: TEAL, marginBottom: 14 }}>📋 Listing Lead Lane</div>
               <div><label style={S.label}>Min DOM</label><input style={S.input} type="number" value={thresholds.listingMinDOM} onChange={e => setThresholds({ ...thresholds, listingMinDOM: parseInt(e.target.value) || 0 })} /></div>
             </div>
 
             <div style={S.card}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: TEAL, marginBottom: 8 }}>About</div>
-              <div style={{ fontSize: 12, color: TEXT2, lineHeight: 1.6 }}>
+              <div style={{ fontWeight: 700, fontSize: 17, color: TEAL, marginBottom: 10 }}>About</div>
+              <div style={{ fontSize: 14, color: TEXT2, lineHeight: 1.7 }}>
                 Deal Screener V1 — The Real Estate Doc<br />
                 Built by Dr. Gina N. Eaton, Ph.D.<br />
                 Howard Hanna Real Estate Services<br />
