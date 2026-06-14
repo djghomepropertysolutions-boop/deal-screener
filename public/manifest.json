@@ -1,0 +1,8 @@
+{
+  "short_name": "Deal Screener",
+  "name": "Deal Screener — The Real Estate Doc",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1B3A4B",
+  "background_color": "#F0F4F8"
+}
