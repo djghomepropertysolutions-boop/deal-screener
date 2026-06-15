@@ -1,576 +1,490 @@
 import { useState, useEffect, useRef, useMemo, useCallback, Component } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DEAL SCREENER — The Real Estate Doc
-// Sprint 1 V3 — Professional Edition
+// DEAL SCREENER V6a — Parser + Dual Upload + Comp Processing + Basic Matching
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ── Design System ─────────────────────────────────────────────────────────────
-const C = {
-  ink: "#0F172A", inkSoft: "#334155", inkMuted: "#94A3B8",
-  bg: "#FAFBFC", white: "#FFFFFF", offWhite: "#F8FAFC",
-  border: "#E2E8F0", borderLight: "#F1F5F9",
-  accent: "#1E3A5F", accentLight: "#2B4C73",
-  gold: "#B8860B", goldLight: "#D4A843",
-  green: "#047857", greenSoft: "#ECFDF5",
-  amber: "#B45309", amberSoft: "#FFFBEB",
-  red: "#B91C1C", redSoft: "#FEF2F2",
-  blue: "#1D4ED8", purple: "#6D28D9",
-};
-const FONT = "'Georgia','Times New Roman',serif";
-const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
-const MONO = "'SF Mono','Fira Code','Consolas',monospace";
+const C={ink:"#0F172A",inkS:"#334155",inkM:"#94A3B8",bg:"#FAFBFC",wh:"#FFFFFF",off:"#F8FAFC",bdr:"#E2E8F0",bdrL:"#F1F5F9",pri:"#1E3A5F",priL:"#2B4C73",gold:"#B8860B",goldL:"#D4A843",grn:"#047857",grnS:"#ECFDF5",amb:"#B45309",ambS:"#FFFBEB",red:"#B91C1C",redS:"#FEF2F2",blu:"#1D4ED8",pur:"#6D28D9"};
+const F="'Georgia','Times New Roman',serif";
+const FS="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+const FM="'SF Mono','Fira Code','Consolas',monospace";
+const $f=n=>"$"+n.toLocaleString("en-US",{maximumFractionDigits:0});
 
-// ── Professional Styles ───────────────────────────────────────────────────────
-const S = {
-  app: { fontFamily: FONT, background: C.bg, minHeight: "100vh", color: C.ink },
-  card: { background: C.white, borderRadius: 4, padding: "20px 24px", marginBottom: 12, border: `1px solid ${C.border}` },
-  cardHover: { background: C.white, borderRadius: 4, padding: "20px 24px", marginBottom: 12, border: `1px solid ${C.border}`, transition: "box-shadow .15s", cursor: "pointer" },
-  label: { display: "block", fontSize: 11, fontWeight: 600, fontFamily: SANS, color: C.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 },
-  input: { width: "100%", padding: "8px 12px", borderRadius: 3, border: `1px solid ${C.border}`, fontSize: 14, fontFamily: FONT, color: C.ink, boxSizing: "border-box", outline: "none", transition: "border-color .15s" },
-  btnPrimary: { background: C.accent, color: C.white, border: "none", borderRadius: 3, padding: "9px 20px", fontSize: 13, fontWeight: 600, fontFamily: SANS, cursor: "pointer", letterSpacing: "0.02em" },
-  btnSecondary: { background: "transparent", color: C.inkSoft, border: `1px solid ${C.border}`, borderRadius: 3, padding: "8px 18px", fontSize: 13, fontWeight: 500, fontFamily: SANS, cursor: "pointer" },
-  btnDanger: { background: "transparent", color: C.red, border: `1px solid ${C.red}44`, borderRadius: 3, padding: "8px 14px", fontSize: 12, fontWeight: 500, fontFamily: SANS, cursor: "pointer" },
-  price: { fontFamily: MONO, fontWeight: 700, fontSize: 18, color: C.accent, letterSpacing: "-0.02em" },
-  stat: { fontFamily: SANS, fontSize: 13, color: C.inkSoft },
-  divider: { width: 1, height: 14, background: C.border, margin: "0 10px", flexShrink: 0 },
-  pill: (bg, fg) => ({ display: "inline-flex", alignItems: "center", gap: 4, background: bg, color: fg, borderRadius: 2, padding: "2px 8px", fontSize: 11, fontWeight: 600, fontFamily: SANS, letterSpacing: "0.03em" }),
-  dot: (c) => ({ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }),
-  sectionLabel: { fontSize: 10, fontWeight: 700, fontFamily: SANS, color: C.inkMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 },
-};
+// ── FMR Rent Data (NE Ohio) ──────────────────────────────────────────────────
+const FD={"44102":[700,850,1100,1280],"44103":[650,800,1000,1180],"44104":[620,770,950,1100],"44105":[650,800,1000,1180],"44106":[750,920,1180,1350],"44107":[780,950,1220,1400],"44108":[620,770,950,1100],"44109":[700,850,1100,1280],"44110":[650,800,1000,1180],"44111":[700,850,1100,1280],"44112":[620,770,950,1100],"44113":[750,920,1180,1350],"44114":[780,950,1200,1380],"44115":[700,850,1100,1280],"44116":[800,980,1250,1420],"44117":[650,800,1000,1180],"44118":[750,920,1180,1350],"44119":[680,840,1080,1250],"44120":[700,860,1100,1280],"44121":[720,880,1130,1300],"44122":[800,980,1250,1420],"44124":[780,950,1220,1400],"44125":[700,860,1100,1280],"44126":[750,920,1180,1350],"44127":[600,750,950,1100],"44128":[680,840,1080,1250],"44129":[720,880,1130,1300],"44130":[750,920,1180,1350],"44131":[700,860,1100,1280],"44132":[680,840,1080,1250],"44133":[750,920,1180,1350],"44134":[720,880,1130,1300],"44135":[680,840,1060,1230],"44136":[750,920,1180,1350],"44137":[680,840,1080,1250],"44138":[750,920,1180,1350],"44139":[800,980,1250,1420],"44141":[750,920,1180,1350],"44143":[720,880,1130,1300],"44144":[680,840,1060,1230],"44145":[780,950,1220,1400],"44146":[720,880,1130,1300],"44147":[750,920,1180,1350],"44301":[650,800,1050,1200],"44302":[600,750,950,1100],"44303":[650,800,1050,1200],"44305":[600,750,950,1100],"44306":[580,720,900,1050],"44307":[600,750,950,1100],"44310":[620,770,980,1130],"44311":[600,750,950,1100],"44312":[700,870,1100,1280],"44313":[750,920,1180,1350],"44314":[620,770,980,1130],"44319":[700,870,1100,1280],"44320":[650,800,1050,1200],"44321":[750,920,1180,1350],"44333":[800,980,1250,1420],"44701":[550,700,880,1020],"44702":[530,680,850,980],"44703":[530,680,850,980],"44704":[550,700,880,1020],"44705":[530,680,850,980],"44706":[550,700,880,1020],"44708":[580,730,920,1060],"44709":[600,750,950,1100],"44718":[650,800,1020,1180],"44720":[680,840,1060,1230],"44646":[650,800,1020,1180]};
+const DFR=[650,800,1000,1180];
+function getFMR(z,b){const i=Math.min(Math.max(b,1),4)-1;return(FD[z]||DFR)[i];}
 
-// ── Status System ─────────────────────────────────────────────────────────────
-const STATUSES = ["Active", "Warm", "Cold", "Closed"];
-const STATUS_DEF = {
-  Active: { color: C.green, desc: "Currently buying — has responded to deals" },
-  Warm: { color: C.amber, desc: "Profile on file — ready to receive deals" },
-  Cold: { color: C.inkMuted, desc: "Sent 3+ deals with no response" },
-  Closed: { color: C.purple, desc: "You've closed a deal with them" },
-};
-const STRATEGIES = ["Flip","BRRRR","Buy & Hold","Section 8","House Hack","Long-Term Rental","Multifamily","Group Home","Any"];
-const CONTACT_TYPES = ["Investor","Buyer","Seller","Wholesaler"];
-
-// ── FMR Rent Reference (NE Ohio) ─────────────────────────────────────────────
-const FMR_DATA = {"44102":[700,850,1100,1280],"44103":[650,800,1000,1180],"44104":[620,770,950,1100],"44105":[650,800,1000,1180],"44106":[750,920,1180,1350],"44107":[780,950,1220,1400],"44108":[620,770,950,1100],"44109":[700,850,1100,1280],"44110":[650,800,1000,1180],"44111":[700,850,1100,1280],"44112":[620,770,950,1100],"44113":[750,920,1180,1350],"44114":[780,950,1200,1380],"44115":[700,850,1100,1280],"44116":[800,980,1250,1420],"44117":[650,800,1000,1180],"44118":[750,920,1180,1350],"44119":[680,840,1080,1250],"44120":[700,860,1100,1280],"44121":[720,880,1130,1300],"44122":[800,980,1250,1420],"44124":[780,950,1220,1400],"44125":[700,860,1100,1280],"44126":[750,920,1180,1350],"44127":[600,750,950,1100],"44128":[680,840,1080,1250],"44129":[720,880,1130,1300],"44130":[750,920,1180,1350],"44131":[700,860,1100,1280],"44132":[680,840,1080,1250],"44133":[750,920,1180,1350],"44134":[720,880,1130,1300],"44135":[680,840,1060,1230],"44136":[750,920,1180,1350],"44137":[680,840,1080,1250],"44138":[750,920,1180,1350],"44139":[800,980,1250,1420],"44140":[780,950,1220,1400],"44141":[750,920,1180,1350],"44142":[680,840,1060,1230],"44143":[720,880,1130,1300],"44144":[680,840,1060,1230],"44145":[780,950,1220,1400],"44146":[720,880,1130,1300],"44147":[750,920,1180,1350],"44301":[650,800,1050,1200],"44302":[600,750,950,1100],"44303":[650,800,1050,1200],"44304":[600,750,950,1100],"44305":[600,750,950,1100],"44306":[580,720,900,1050],"44307":[600,750,950,1100],"44310":[620,770,980,1130],"44311":[600,750,950,1100],"44312":[700,870,1100,1280],"44313":[750,920,1180,1350],"44314":[620,770,980,1130],"44319":[700,870,1100,1280],"44320":[650,800,1050,1200],"44321":[750,920,1180,1350],"44333":[800,980,1250,1420],"44701":[550,700,880,1020],"44702":[530,680,850,980],"44703":[530,680,850,980],"44704":[550,700,880,1020],"44705":[530,680,850,980],"44706":[550,700,880,1020],"44707":[530,680,850,980],"44708":[580,730,920,1060],"44709":[600,750,950,1100],"44710":[530,680,850,980],"44714":[550,700,880,1020],"44718":[650,800,1020,1180],"44720":[680,840,1060,1230],"44646":[650,800,1020,1180],"44685":[680,840,1060,1230]};
-const DEF_FMR = [650,800,1000,1180];
-function getFMR(zip, beds) { const b = Math.min(Math.max(beds, 1), 4) - 1; return (FMR_DATA[zip] || DEF_FMR)[b]; }
-
-// ── All 24 Contacts (from Investor Master List) ──────────────────────────────
-const ALL_CONTACTS = [
-  { id:"INV-001",name:"Irwin Buhain",email:"irwin@homebuyerplus.com",phone:"",role:"Investor",strategy:"Buy & Hold",priceMax:300000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"1-4 units; Cleveland, Akron, Canton" },
-  { id:"INV-002",name:"Andres",email:"andres@tauroacquisition.com",phone:"",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING"],hardRules:["SFH only"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Cleveland, Akron, Canton" },
-  { id:"INV-003",name:"Taden Hatch",email:"taden@hauerhouses.com",phone:"",role:"Investor",strategy:"Flip",priceMax:200000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Prefers extremely distressed properties; Cleveland, Akron, Canton" },
-  { id:"INV-004",name:"Nick Campo",email:"deals.flashflipllc@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["SFH<$600K","MF 8-20 units<$1.2M","MHP<$850K"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also Buy & Hold; SFH/MF/MHP" },
-  { id:"INV-005",name:"Isaiah Collier",email:"sweethomepropgroup@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:3,bathsMin:2,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING"],hardRules:["Stay within $250K or less","No foundation issues"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also long-term rentals" },
-  { id:"BUY-001",name:"Brook",email:"bharville123@gmail.com",phone:"",role:"Buyer",strategy:"House Hack",priceMax:190000,bedsMin:1,bathsMin:1,sqftMin:0,geoRequired:["Warrensville Heights","Maple Heights","Bedford","Bedford Heights","Garfield Heights","Northfield","Sagamore Hills"],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["1-2 units only","No 6+ bed properties","No DODD/group home"],rehab:"Light",braStatus:"No",braExpires:"",status:"Active",notes:"Proof of funds verified; Ready to receive deals",preApproval:"Yes",lender:"" },
-  { id:"INV-007",name:"Larry Cox",email:"new2uinvestmentsllc@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:80000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:["Cleveland","Garfield Heights","Cleveland Heights","Parma","Berea","Euclid","Lakewood","Brooklyn"],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["Max $80K HARD ceiling"],rehab:"Light to Moderate",braStatus:"No",braExpires:"",status:"Warm",notes:"1-4 units; Cleveland area and surrounding suburbs" },
-  { id:"INV-008",name:"Christopher Shambley",email:"chrisshambley01@gmail.com",phone:"",role:"Investor",strategy:"Buy & Hold",priceMax:100000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:["Warrensville Heights","Maple Heights","Bedford","Bedford Heights","Garfield Heights"],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["ONLY these 5 cities — hard geo fail otherwise"],rehab:"Light to Moderate",braStatus:"Yes",braExpires:"",status:"Warm",notes:"1-4 units; Proof of funds verified" },
-  { id:"INV-009",name:"Colton Tolleson",email:"ctolly27@gmail.com",phone:"",role:"Investor",strategy:"BRRRR",priceMax:185000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["All-in ≤ 60% ARV","Hard money financing"],rehab:"Light to Moderate",braStatus:"No",braExpires:"",status:"Warm",notes:"Also Buy & Hold; Cleveland, Akron, Canton" },
-  { id:"INV-010",name:"Scott Jenkins",email:"scott@dogwoodhomesolutions.com",phone:"",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR and Buy & Hold; Cleveland, Akron, Canton" },
-  { id:"INV-011",name:"Noah Daniels-Wilder",email:"noah@drivejdwlogistics.com",phone:"",role:"Investor",strategy:"BRRRR",priceMax:175000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:["East Cleveland"],subTypes:["SING","MULTI"],hardRules:["All-in ≤ 60% ARV — verify EVERY send","Hard money financing"],rehab:"Light to Moderate",braStatus:"No",braExpires:"",status:"Warm",notes:"Also Section 8; No East Cleveland" },
-  { id:"INV-012",name:"Cheryl James",email:"ctherejames@gmail.com",phone:"",role:"Investor",strategy:"Multifamily",priceMax:250000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["MULTI"],hardRules:["Multifamily only"],rehab:"Light to Moderate",braStatus:"No",braExpires:"",status:"Warm",notes:"Cleveland area and surrounding suburbs" },
-  { id:"INV-013",name:"Ivan Torres",email:"ivantorresarchila@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:200000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["7-day inspection","EMD after inspection","30-day close"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR and Buy & Hold" },
-  { id:"INV-014",name:"Lourdes Elias Sanchez",email:"lerealtylv@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:300000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["Cash buyer","Allows assignment","15-day close"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"$300K-$500K range; Also BRRRR and Buy & Hold" },
-  { id:"WHO-001",name:"Ahmed Khaled",email:"ahmedabdelatif110@gmail.com",phone:"",role:"Wholesaler",strategy:"Any",priceMax:1000000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["Source/referral ONLY — do NOT send retail deals"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Wholesaler — referral source only" },
-  { id:"WHO-002",name:"Travis Antienowicz",email:"travis.antienowicz0527@gmail.com",phone:"",role:"Wholesaler",strategy:"Any",priceMax:1000000,bedsMin:0,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["Source/referral ONLY — do NOT send retail deals"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Wholesaler — referral source only" },
-  { id:"INV-017",name:"Victor Blandon",email:"mctvconstruction25@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:100000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR/Hold/Multifamily; Prefers distressed; Cleveland, Akron, Canton" },
-  { id:"INV-018",name:"Luis Espinal",email:"luiscash4doors@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:175000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR/Hold/Multifamily; Prefers distressed; Cleveland, Akron, Canton" },
-  { id:"INV-019",name:"Victor",email:"blueroseheights@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:150000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Blue Rose Heights; Also BRRRR/Hold/Multifamily; Prefers distressed" },
-  { id:"INV-020",name:"Kelvin Marwane",email:"homesfastrack@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:125000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["$1K refundable EMD","14-day inspection","14-30 day flexible close","As-is purchase, no repairs/concessions"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR/Hold/Multifamily; Prefers distressed; Specific offer terms on file" },
-  { id:"INV-021",name:"Martin Sands",email:"martinsandcoaching@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:160000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR/Hold/Multifamily; Prefers distressed; Cleveland, Akron, Canton" },
-  { id:"INV-022",name:"Obed Panda",email:"obed.mavana@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:120000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR/Hold/Multifamily; Prefers distressed; Cleveland, Akron, Canton" },
-  { id:"INV-023",name:"G Smith",email:"246parrish@gmail.com",phone:"",role:"Investor",strategy:"Flip",priceMax:50000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:[],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Also BRRRR/Hold/Multifamily; Prefers distressed; Cleveland, Akron, Canton" },
-  { id:"INV-024",name:"Matt Beard",email:"mattbeard@mainplacehomes.com",phone:"",role:"Investor",strategy:"Flip",priceMax:150000,bedsMin:2,bathsMin:0,sqftMin:0,geoRequired:[],geoExclude:[],subTypes:["SING","MULTI"],hardRules:["Under $150K","2-4 bed single family or duplex"],rehab:"Full to Cosmetic",braStatus:"No",braExpires:"",status:"Warm",notes:"Prefers distressed; Cleveland, Akron, Canton" },
-];
-
-// ── CSV Parser (exact Matrix Agent Single Line) ──────────────────────────────
-function parseCSV(text) {
-  const lines = []; let cur = "", inQ = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '"') { inQ = !inQ; continue; }
-    if (ch === "\n" && !inQ) { lines.push(cur); cur = ""; continue; }
-    if (ch === "\r" && !inQ) continue;
-    cur += ch;
-  }
-  if (cur.trim()) lines.push(cur);
-  if (lines.length < 2) return [];
-  // Parse headers with same quote-aware logic as data rows
-  const hdrRaw = [];
-  { let c = "", q = false;
-    for (let i = 0; i < lines[0].length; i++) { const ch = lines[0][i]; if (ch === '"') { q = !q; continue; } if (ch === "," && !q) { hdrRaw.push(c.trim()); c = ""; continue; } c += ch; }
-    hdrRaw.push(c.trim());
-  }
-  const hdr = hdrRaw;
-  const fi = (n) => hdr.findIndex(h => h.toLowerCase() === n.toLowerCase());
-  const ci = { mls: fi("MLS #"), type: fi("Type"), sub: fi("Sub Type"), status: fi("Status"), date: fi("Status Change Timestamp"), price: fi("Price"), dom: fi("DOM/CDOM"), addr: fi("Address"), city: fi("City"), zip: fi("Postal Code"), beds: fi("Bedrooms Total"), ba: fi("BA"), sqft: fi("Above Grade Finished Area"), acres: fi("Lot Size Acres"), yr: fi("Year Built"), garage: fi("Garage Spaces"), tax: fi("Annual Taxes") };
-
-  return lines.slice(1).filter(l => l.trim()).map(line => {
-    const v = []; let c = "", q = false;
-    for (let i = 0; i < line.length; i++) { const ch = line[i]; if (ch === '"') { q = !q; continue; } if (ch === "," && !q) { v.push(c.trim()); c = ""; continue; } c += ch; }
-    v.push(c.trim());
-    const g = (k) => ci[k] >= 0 ? (v[ci[k]] || "").trim() : "";
-    const $ = (k) => { const r = g(k).replace(/[$,]/g, ""); return r ? parseFloat(r) : 0; };
-    const n = (k) => { const r = g(k).replace(/,/g, ""); return r ? parseFloat(r) : 0; };
-    const domRaw = g("dom").split("/"); const dom = parseInt(domRaw[0]) || 0; const cdom = parseInt(domRaw[1]) || dom;
-    const baRaw = g("ba"); let bT = 0, bF = 0, bH = 0;
-    const baM = baRaw.match(/(\d+)\s*\((\d+)\/(\d+)\)/);
-    if (baM) { bT = +baM[1]; bF = +baM[2]; bH = +baM[3]; } else { bT = parseInt(baRaw) || 0; bF = bT; }
-    const price = $("price"); const sqft = n("sqft");
-    return { mls: g("mls"), type: g("type"), subType: g("sub"), status: g("status"), statusDate: g("date"), price, dom, cdom, address: g("addr"), city: g("city"), zip: g("zip"), beds: n("beds"), baths: bT, fullBaths: bF, halfBaths: bH, sqft, acres: n("acres"), yearBuilt: n("yr"), garage: n("garage"), taxes: $("tax"), ppsf: sqft > 0 ? Math.round(price / sqft) : 0 };
-  }).filter(r => r.mls && r.price > 0);
+// ── Rehab Estimates ──────────────────────────────────────────────────────────
+function estRehab(yr,sqft,condition){
+  if(!yr||!sqft)return 0;
+  const cond=(condition||"").toLowerCase();
+  if(cond.includes("new construction"))return Math.round(5*sqft);
+  if(cond.includes("updated")||cond.includes("remodeled"))return Math.round(10*sqft);
+  if(cond.includes("fixer"))return Math.round(40*sqft);
+  // fallback by year
+  if(yr<1950)return Math.round(42*sqft);
+  if(yr<1970)return Math.round(30*sqft);
+  if(yr<1990)return Math.round(20*sqft);
+  return Math.round(12*sqft);
 }
 
-// ── Matching Engine ──────────────────────────────────────────────────────────
-function matchAll(listings, contacts, sent) {
-  const out = {};
-  contacts.forEach(ct => {
-    if (ct.status === "Cold" || ct.status === "Closed") return;
-    if (ct.role === "Wholesaler") return; // Wholesalers excluded from auto-matching
-    const mx = [];
-    listings.forEach(li => {
-      const sigs = []; let fail = false;
-      if (li.price > (ct.priceMax || 9999999)) fail = true;
-      if (!fail) sigs.push({ l: "Price within range", w: 1 });
-      if ((ct.bedsMin || 0) > 0 && li.beds < ct.bedsMin) fail = true;
-      if ((ct.bathsMin || 0) > 0 && li.baths < ct.bathsMin) fail = true;
-      if ((ct.sqftMin || 0) > 0 && li.sqft > 0 && li.sqft < ct.sqftMin) fail = true;
-      if (ct.geoRequired?.length > 0 && !ct.geoRequired.some(g => li.city.toLowerCase() === g.toLowerCase())) fail = true;
-      else if (ct.geoRequired?.length > 0) sigs.push({ l: "In target area", w: 2 });
-      if (ct.geoExclude?.length > 0 && ct.geoExclude.some(g => li.city.toLowerCase() === g.toLowerCase())) fail = true;
-      if (ct.subTypes?.length > 0 && !ct.subTypes.includes("Any") && !ct.subTypes.includes(li.subType)) fail = true;
-      if (fail) return;
-      const fmr = getFMR(li.zip, li.beds);
-      if (li.price > 0 && fmr > 0) { const rr = (fmr / li.price) * 100; if (rr >= 1) sigs.push({ l: `${rr.toFixed(1)}% rent ratio (meets 1% rule)`, w: 2 }); else if (rr >= 0.8) sigs.push({ l: `${rr.toFixed(1)}% rent ratio`, w: 1 }); }
-      if (li.dom >= 90) sigs.push({ l: `${li.dom} days — highly motivated`, w: 2 }); else if (li.dom >= 60) sigs.push({ l: `${li.dom} days — motivated`, w: 1.5 }); else if (li.dom >= 30) sigs.push({ l: `${li.dom} days on market`, w: 1 });
-      if (li.ppsf > 0 && li.ppsf < 45) sigs.push({ l: `$${li.ppsf}/sqft — below market`, w: 1.5 });
-      if (li.taxes > 0 && fmr > 0) { const tr = (li.taxes / (fmr * 12)) * 100; if (tr < 15) sigs.push({ l: `Low tax burden (${tr.toFixed(0)}%)`, w: 1 }); }
-      const tw = sigs.reduce((s, x) => s + x.w, 0);
-      const conf = tw >= 5 ? "strong" : tw >= 3 ? "good" : "possible";
-      const sTo = sent[li.mls] || [];
-      mx.push({ ...li, signals: sigs, confidence: conf, alreadySent: sTo.includes(ct.name), sentTo: sTo, fmr });
+// ── Status & Strategy Constants ──────────────────────────────────────────────
+const STATUSES=["Active","Warm","Cold","Closed"];
+const STAT_C={Active:C.grn,Warm:C.amb,Cold:C.inkM,Closed:C.pur};
+const STRATEGIES=["Flip","BRRRR","Buy & Hold","Section 8","House Hack","Long-Term Rental","Multifamily","Group Home","Any"];
+const ROLES=["Investor","Buyer","Seller","Wholesaler"];
+
+// ── Contacts ─────────────────────────────────────────────────────────────────
+const DEF_CT=[
+{id:"I01",name:"Irwin Buhain",email:"irwin@homebuyerplus.com",role:"Investor",strategy:"Buy & Hold",priceMax:300000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"1-4 units; CLE/AKR/CAN"},
+{id:"I02",name:"Andres",email:"andres@tauroacquisition.com",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING"],hardRules:["SFH only"],braStatus:"No",status:"Warm",notes:"CLE/AKR/CAN"},
+{id:"I03",name:"Taden Hatch",email:"taden@hauerhouses.com",role:"Investor",strategy:"Flip",priceMax:200000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Extremely distressed"},
+{id:"I04",name:"Nick Campo",email:"deals.flashflipllc@gmail.com",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Also Buy & Hold"},
+{id:"I05",name:"Isaiah Collier",email:"sweethomepropgroup@gmail.com",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:3,bathsMin:2,geoReq:[],geoEx:[],subTypes:["SING"],hardRules:["No foundation issues"],braStatus:"No",status:"Warm",notes:"Also long-term rentals"},
+{id:"B01",name:"Brook",email:"bharville123@gmail.com",role:"Buyer",strategy:"House Hack",priceMax:190000,bedsMin:1,bathsMin:1,geoReq:["Warrensville Heights","Maple Heights","Bedford","Bedford Heights","Garfield Heights","Northfield","Sagamore Hills"],geoEx:[],subTypes:["SING","MULTI"],hardRules:["1-2 units only","No 6+ beds","No DODD"],braStatus:"No",status:"Active",notes:"POF verified"},
+{id:"I07",name:"Larry Cox",email:"new2uinvestmentsllc@gmail.com",role:"Investor",strategy:"Flip",priceMax:80000,bedsMin:0,bathsMin:0,geoReq:["Cleveland","Garfield Heights","Cleveland Heights","Parma","Berea","Euclid","Lakewood","Brooklyn"],geoEx:[],subTypes:["SING","MULTI"],hardRules:["$80K HARD ceiling"],braStatus:"No",status:"Warm",notes:"1-4 units"},
+{id:"I08",name:"Christopher Shambley",email:"chrisshambley01@gmail.com",role:"Investor",strategy:"Buy & Hold",priceMax:100000,bedsMin:0,bathsMin:0,geoReq:["Warrensville Heights","Maple Heights","Bedford","Bedford Heights","Garfield Heights"],geoEx:[],subTypes:["SING","MULTI"],hardRules:["ONLY these 5 cities"],braStatus:"Yes",status:"Warm",notes:"POF verified"},
+{id:"I09",name:"Colton Tolleson",email:"ctolly27@gmail.com",role:"Investor",strategy:"BRRRR",priceMax:185000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:["All-in ≤60% ARV"],braStatus:"No",status:"Warm",notes:"Also Buy & Hold"},
+{id:"I10",name:"Scott Jenkins",email:"scott@dogwoodhomesolutions.com",role:"Investor",strategy:"Flip",priceMax:250000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Also BRRRR/Hold"},
+{id:"I11",name:"Noah Daniels-Wilder",email:"noah@drivejdwlogistics.com",role:"Investor",strategy:"BRRRR",priceMax:175000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:["East Cleveland"],subTypes:["SING","MULTI"],hardRules:["All-in ≤60% ARV"],braStatus:"No",status:"Warm",notes:"Also Section 8"},
+{id:"I12",name:"Cheryl James",email:"ctherejames@gmail.com",role:"Investor",strategy:"Multifamily",priceMax:250000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["MULTI"],hardRules:["Multifamily only"],braStatus:"No",status:"Warm",notes:"Cleveland area"},
+{id:"I13",name:"Ivan Torres",email:"ivantorresarchila@gmail.com",role:"Investor",strategy:"Flip",priceMax:200000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:["7-day inspection","30-day close"],braStatus:"No",status:"Warm",notes:"Also BRRRR/Hold"},
+{id:"I14",name:"Lourdes Elias Sanchez",email:"lerealtylv@gmail.com",role:"Investor",strategy:"Flip",priceMax:300000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:["Cash buyer","15-day close"],braStatus:"No",status:"Warm",notes:"Also BRRRR/Hold"},
+{id:"W01",name:"Ahmed Khaled",email:"ahmedabdelatif110@gmail.com",role:"Wholesaler",strategy:"Any",priceMax:1000000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:["Referral ONLY"],braStatus:"No",status:"Warm",notes:"Wholesaler"},
+{id:"W02",name:"Travis Antienowicz",email:"travis.antienowicz0527@gmail.com",role:"Wholesaler",strategy:"Any",priceMax:1000000,bedsMin:0,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:["Referral ONLY"],braStatus:"No",status:"Warm",notes:"Wholesaler"},
+{id:"I17",name:"Victor Blandon",email:"mctvconstruction25@gmail.com",role:"Investor",strategy:"Flip",priceMax:100000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Distressed; BRRRR/Hold"},
+{id:"I18",name:"Luis Espinal",email:"luiscash4doors@gmail.com",role:"Investor",strategy:"Flip",priceMax:175000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Distressed; BRRRR/Hold"},
+{id:"I19",name:"Victor",email:"blueroseheights@gmail.com",role:"Investor",strategy:"Flip",priceMax:150000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Blue Rose Heights; Distressed"},
+{id:"I20",name:"Kelvin Marwane",email:"homesfastrack@gmail.com",role:"Investor",strategy:"Flip",priceMax:125000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:["$1K EMD","14-day inspection","As-is"],braStatus:"No",status:"Warm",notes:"Distressed; Specific terms"},
+{id:"I21",name:"Martin Sands",email:"martinsandcoaching@gmail.com",role:"Investor",strategy:"Flip",priceMax:160000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Distressed; BRRRR/Hold"},
+{id:"I22",name:"Obed Panda",email:"obed.mavana@gmail.com",role:"Investor",strategy:"Flip",priceMax:120000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Distressed; BRRRR/Hold"},
+{id:"I23",name:"G Smith",email:"246parrish@gmail.com",role:"Investor",strategy:"Flip",priceMax:50000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:[],braStatus:"No",status:"Warm",notes:"Distressed; BRRRR/Hold"},
+{id:"I24",name:"Matt Beard",email:"mattbeard@mainplacehomes.com",role:"Investor",strategy:"Flip",priceMax:150000,bedsMin:2,bathsMin:0,geoReq:[],geoEx:[],subTypes:["SING","MULTI"],hardRules:["Under $150K"],braStatus:"No",status:"Warm",notes:"2-4 bed SFH/duplex; Distressed"},
+];
+
+// ── CSV Parser (48-column Deal Screener Export) ──────────────────────────────
+function parseCSV(text){
+  const lines=[];let cur="",inQ=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){inQ=!inQ;continue;}if(ch==="\n"&&!inQ){lines.push(cur);cur="";continue;}if(ch==="\r"&&!inQ)continue;cur+=ch;}
+  if(cur.trim())lines.push(cur);
+  if(lines.length<2)return[];
+  // Quote-aware header parsing
+  const hdr=[];{let c="",q=false;for(let i=0;i<lines[0].length;i++){const ch=lines[0][i];if(ch==='"'){q=!q;continue;}if(ch===","&&!q){hdr.push(c.trim());c="";continue;}c+=ch;}hdr.push(c.trim());}
+  const fi=n=>hdr.findIndex(h=>h.toLowerCase()===n.toLowerCase());
+  // Map all 48 columns
+  const ci={addr:fi("Address"),city:fi("City"),county:fi("County"),price:fi("Current Price"),zip:fi("Postal Code"),subType:fi("Property Sub Type"),propType:fi("Property Type"),units:fi("# Units Total"),sqft:fi("Above Grade Finished Area"),style:fi("Architectural Style"),basement:fi("Basement"),bathsFull:fi("Bathrooms Full"),bathsHalf:fi("Bathrooms Half"),beds:fi("Bedrooms Total"),bga:fi("Below Grade Finished Area"),garage:fi("Garage Spaces"),acres:fi("Lot Size Acres"),stories:fi("Stories"),yr:fi("Year Built"),tax:fi("Annual Taxes"),assocYN:fi("Association YN"),grossRent:fi("Gross Rent Total"),homestead:fi("Homestead Exemption YN"),insurance:fi("Insurance Cost"),noi:fi("Net Operating Income"),opex:fi("Operating Expense"),avm:fi("Realist AVM"),domCdom:fi("DOM/CDOM"),onMktDate:fi("On Market Date"),origPrice:fi("Original List Price"),prevPrice:fi("Previous List Price"),priceChgDate:fi("Price Change Timestamp"),buyerFin:fi("Buyer Financing"),closeDate:fi("Close Date"),closePrice:fi("Close Price"),sellerCC:fi("Seller Paid Closing Costs"),courtOrdered:fi("Court Ordered YN"),leases:fi("Existing Leases"),foundation:fi("Foundation Details"),listTerms:fi("Listing Terms"),occupant:fi("Occupant Type"),condition:fi("Property Condition"),remarks:fi("Public Remarks"),delinquent:fi("Realist Delinquent"),foreclosure:fi("Realist Foreclosure"),school:fi("School District"),agentRemarks:fi("Agent Only Remarks"),zoning:fi("Zoning")};
+  return lines.slice(1).filter(l=>l.trim()).map(line=>{
+    const v=[];let c="",q=false;
+    for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){q=!q;continue;}if(ch===","&&!q){v.push(c.trim());c="";continue;}c+=ch;}v.push(c.trim());
+    const g=k=>ci[k]>=0?(v[ci[k]]||"").trim():"";
+    const mn=k=>{const r=g(k).replace(/[$,]/g,"");return r?parseFloat(r):0;};
+    const price=mn("price");const sqft=mn("sqft");const avm=mn("avm");
+    const domR=g("domCdom").split("/");const dom=parseInt(domR[0])||0;const cdom=parseInt(domR[1])||dom;
+    const closeP=mn("closePrice");
+    const origP=mn("origPrice");const prevP=mn("prevPrice");
+    // Composite key (MLS# missing from export)
+    const key=(g("addr")+"|"+g("city")+"|"+g("zip")).toLowerCase();
+    // Map sub type from full name to short code
+    let st=g("subType");
+    if(st.toLowerCase().includes("single"))st="SING";
+    else if(st.toLowerCase().includes("condo"))st="CONDO";
+    else if(st.toLowerCase().includes("multi")||st.toLowerCase().includes("duplex")||st.toLowerCase().includes("triplex"))st="MULTI";
+    else if(st.toLowerCase().includes("land"))st="LAND";
+    return{key,addr:g("addr"),city:g("city"),county:g("county"),price,zip:g("zip"),subType:st,subTypeFull:g("subType"),propType:g("propType"),units:mn("units"),sqft,style:g("style"),basement:g("basement"),bathsFull:mn("bathsFull"),bathsHalf:mn("bathsHalf"),baths:mn("bathsFull")+mn("bathsHalf")*0.5,beds:mn("beds"),bga:mn("bga"),garage:mn("garage"),acres:mn("acres"),stories:g("stories"),yr:mn("yr"),tax:mn("tax"),assocYN:g("assocYN"),grossRent:mn("grossRent"),homestead:g("homestead"),insurance:mn("insurance"),noi:mn("noi"),opex:mn("opex"),avm,dom,cdom,onMktDate:g("onMktDate"),origPrice:origP,prevPrice:prevP,priceChgDate:g("priceChgDate"),buyerFin:g("buyerFin"),closeDate:g("closeDate"),closePrice:closeP,sellerCC:mn("sellerCC"),courtOrdered:g("courtOrdered"),leases:g("leases"),foundation:g("foundation"),listTerms:g("listTerms"),occupant:g("occupant"),condition:g("condition"),remarks:g("remarks"),delinquent:g("delinquent"),foreclosure:g("foreclosure"),school:g("school"),agentRemarks:g("agentRemarks"),zoning:g("zoning"),
+    // Computed
+    ppsf:sqft>0?Math.round(price/sqft):0,
+    reduced:origP>0&&origP>price,
+    dropPct:origP>0?Math.round((origP-price)/origP*100):0,
+    isSold:closeP>0&&g("closeDate")!=="",
+    };
+  }).filter(r=>r.addr&&(r.price>0||r.closePrice>0));
+}
+
+// ── Sold Comp Processor ──────────────────────────────────────────────────────
+function buildCompData(soldListings){
+  const byZip={};
+  soldListings.forEach(s=>{
+    if(!s.zip)return;
+    const soldP=s.closePrice||s.price;
+    const sf=s.sqft;
+    if(!soldP||!sf||sf<=0)return;
+    const ppsf=Math.round(soldP/sf);
+    if(!byZip[s.zip])byZip[s.zip]={prices:[],ppsfs:[],count:0};
+    byZip[s.zip].prices.push(soldP);
+    byZip[s.zip].ppsfs.push(ppsf);
+    byZip[s.zip].count++;
+  });
+  Object.keys(byZip).forEach(z=>{
+    const d=byZip[z];
+    d.avgPpsf=Math.round(d.ppsfs.reduce((a,b)=>a+b,0)/d.ppsfs.length);
+    d.medPrice=d.prices.sort((a,b)=>a-b)[Math.floor(d.prices.length/2)];
+    d.avgPrice=Math.round(d.prices.reduce((a,b)=>a+b,0)/d.prices.length);
+  });
+  return byZip;
+}
+
+// ── Matching Engine (V6a: basic buy-box + opportunity signals) ────────────────
+function matchAll(listings,contacts,compData,sent){
+  const out={};
+  contacts.forEach(ct=>{
+    if(ct.status==="Cold"||ct.status==="Closed"||ct.role==="Wholesaler")return;
+    const mx=[];
+    listings.forEach(li=>{
+      if(li.isSold)return; // Don't match sold listings
+      // Buy box pass/fail
+      if(li.price>(ct.priceMax||9999999))return;
+      if((ct.bedsMin||0)>0&&li.beds<ct.bedsMin)return;
+      if((ct.bathsMin||0)>0&&li.baths<ct.bathsMin)return;
+      if(ct.geoReq?.length>0&&!ct.geoReq.some(g=>li.city.toLowerCase()===g.toLowerCase()))return;
+      if(ct.geoEx?.length>0&&ct.geoEx.some(g=>li.city.toLowerCase()===g.toLowerCase()))return;
+      if(ct.subTypes?.length>0&&!ct.subTypes.includes("Any")&&!ct.subTypes.includes(li.subType))return;
+      // Isaiah foundation check
+      if(ct.hardRules?.some(r=>r.toLowerCase().includes("foundation"))&&li.foundation&&li.foundation.toLowerCase().includes("damage"))return;
+
+      const sigs=[];
+      // ARV comparison (Realist AVM primary, comp data secondary)
+      const arv=li.avm||(compData[li.zip]?compData[li.zip].avgPpsf*li.sqft:0);
+      if(arv>0&&li.price>0){
+        const arvRatio=li.price/arv;
+        if(arvRatio<=0.6)sigs.push({l:"Price is "+Math.round((1-arvRatio)*100)+"% below estimated value ("+$f(arv)+")",w:3});
+        else if(arvRatio<=0.75)sigs.push({l:"Price is "+Math.round((1-arvRatio)*100)+"% below est. value ("+$f(arv)+")",w:2});
+        else if(arvRatio<=0.85)sigs.push({l:"Priced "+Math.round((1-arvRatio)*100)+"% below est. value",w:1});
+      }
+      // Geo match
+      if(ct.geoReq?.length>0)sigs.push({l:"In target area ("+li.city+")",w:1.5});
+      // Rent ratio
+      const rent=li.grossRent||getFMR(li.zip,li.beds);
+      if(rent>0&&li.price>0){
+        const rr=(rent/li.price)*100;
+        if(rr>=1.2)sigs.push({l:rr.toFixed(1)+"% rent ratio — strong cash flow",w:2});
+        else if(rr>=1.0)sigs.push({l:rr.toFixed(1)+"% rent ratio (1% rule)",w:1.5});
+        else if(rr>=0.8)sigs.push({l:rr.toFixed(1)+"% rent ratio",w:0.5});
+      }
+      // DOM
+      if(li.dom>=90)sigs.push({l:li.dom+" days — highly motivated",w:1.5});
+      else if(li.dom>=60)sigs.push({l:li.dom+" days — motivated",w:1});
+      // Price reduction
+      if(li.reduced&&li.dropPct>=10)sigs.push({l:"Price reduced "+li.dropPct+"% from "+$f(li.origPrice),w:1.5});
+      else if(li.reduced)sigs.push({l:"Price reduced "+li.dropPct+"%",w:0.5});
+      // Condition
+      if((li.condition||"").toLowerCase().includes("fixer"))sigs.push({l:"Listed as Fixer",w:1});
+      // Foreclosure / Court Ordered
+      if(li.foreclosure==="Yes")sigs.push({l:"Realist Foreclosure flag",w:1.5});
+      if(li.courtOrdered==="Yes")sigs.push({l:"Court ordered sale",w:1});
+      // Vacant
+      if(li.occupant==="Vacant")sigs.push({l:"Vacant — immediate access",w:0.5});
+      // Tenant in place
+      if(li.occupant==="Tenant")sigs.push({l:"Tenant in place — income from day 1",w:0.5});
+      // Multifamily bonus for multifamily investors
+      if(ct.strategy==="Multifamily"&&li.subType==="MULTI")sigs.push({l:"Multi-family property",w:1.5});
+
+      // Grade
+      const tw=sigs.reduce((s,x)=>s+x.w,0);
+      let grade="D";
+      if(tw>=5)grade="A";
+      else if(tw>=2.5)grade="B";
+      else if(tw>=0.5)grade="C";
+      if(sigs.length===0)return;
+
+      const sentKey=li.key;
+      const sTo=sent[sentKey]||[];
+      mx.push({...li,sigs,grade,arv:arv||0,rent,alreadySent:sTo.length>0,sentTo:sTo});
     });
-    mx.sort((a, b) => ({ strong: 0, good: 1, possible: 2 }[a.confidence] || 9) - ({ strong: 0, good: 1, possible: 2 }[b.confidence] || 9));
-    if (mx.length > 0) out[ct.id] = { contact: ct, matches: mx };
+    mx.sort((a,b)=>({A:0,B:1,C:2,D:3}[a.grade]||9)-({A:0,B:1,C:2,D:3}[b.grade]||9));
+    if(mx.length>0)out[ct.id]={contact:ct,matches:mx};
   });
   return out;
 }
 
-// ── Format helpers ────────────────────────────────────────────────────────────
-const fmtP = (n) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
-function Toasts({ items, set }) {
-  useEffect(() => { if (items.length > 0) { const t = setTimeout(() => set(p => p.slice(1)), 3500); return () => clearTimeout(t); } }, [items, set]);
-  if (!items.length) return null;
-  return (<div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999 }}>
-    {items.map(t => <div key={t.id} style={{ background: C.accent, color: C.white, padding: "10px 16px", borderRadius: 3, fontSize: 13, fontFamily: SANS, fontWeight: 500, marginBottom: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }}>{t.msg}</div>)}
-  </div>);
+// ── Drop Zone ────────────────────────────────────────────────────────────────
+function DropZone({label,sub,count,lastDate,alert,alertC,onFiles,accent}){
+  const[over,setOver]=useState(false);const ref=useRef(null);
+  const handle=files=>{Array.from(files).filter(f=>f.name.endsWith(".csv")).forEach(f=>{const r=new FileReader();r.onload=e=>onFiles(e.target.result,f.name);r.readAsText(f);});};
+  return(
+    <div onDragOver={e=>{e.preventDefault();setOver(true);}} onDragLeave={()=>setOver(false)} onDrop={e=>{e.preventDefault();setOver(false);handle(e.dataTransfer.files);}}
+      onClick={()=>ref.current?.click()}
+      style={{flex:1,border:`2px dashed ${over?accent:C.bdr}`,borderRadius:6,padding:"22px 16px",textAlign:"center",cursor:"pointer",background:over?accent+"08":C.wh,transition:"all .15s"}}>
+      <input ref={ref} type="file" accept=".csv" multiple onChange={e=>{handle(e.target.files);e.target.value="";}} style={{display:"none"}}/>
+      <div style={{fontSize:12,fontFamily:FS,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>{label}</div>
+      {count>0?<div style={{fontFamily:FM,fontSize:24,fontWeight:700,color:C.ink}}>{count.toLocaleString()} listings</div>
+      :<div style={{fontSize:14,color:C.inkS}}>Drop CSV files here or click to browse</div>}
+      {sub&&<div style={{fontSize:12,fontFamily:FS,color:C.inkM,marginTop:4}}>{sub}</div>}
+      {lastDate&&<div style={{fontSize:11,fontFamily:FS,color:C.inkM,marginTop:4}}>Updated: {lastDate}</div>}
+      {alert&&<div style={{fontSize:12,fontFamily:FS,fontWeight:600,color:alertC||C.amb,marginTop:6}}>{alert}</div>}
+    </div>
+  );
 }
 
-// ── Contact Form ──────────────────────────────────────────────────────────────
-function ContactForm({ initial, onSave, onCancel }) {
-  const blank = { name:"",email:"",phone:"",role:"Investor",strategy:"Any",priceMax:"",bedsMin:"",bathsMin:"",sqftMin:"",geoRequired:"",geoExclude:"",subTypes:"SING,MULTI",hardRules:"",rehab:"",braStatus:"No",braExpires:"",status:"Warm",notes:"",preApproval:"",lender:"" };
-  const [f, setF] = useState(() => {
-    if (!initial) return blank;
-    return { ...initial, geoRequired: (initial.geoRequired || []).join(", "), geoExclude: (initial.geoExclude || []).join(", "), hardRules: (initial.hardRules || []).join("; "), subTypes: (initial.subTypes || []).join(","), priceMax: initial.priceMax || "", bedsMin: initial.bedsMin || "", bathsMin: initial.bathsMin || "", sqftMin: initial.sqftMin || "" };
-  });
-  const up = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const grid = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 16px" };
-  return (
-    <div style={{ ...S.card, borderLeft: `3px solid ${C.accent}` }}>
-      <div style={{ fontSize: 16, fontWeight: 700, color: C.accent, marginBottom: 16 }}>{initial ? "Edit Contact" : "New Contact"}</div>
-      <div style={grid}>
-        <div><label style={S.label}>Name</label><input style={S.input} value={f.name} onChange={e => up("name",e.target.value)} /></div>
-        <div><label style={S.label}>Email</label><input style={S.input} value={f.email} onChange={e => up("email",e.target.value)} /></div>
-        <div><label style={S.label}>Phone</label><input style={S.input} value={f.phone} onChange={e => up("phone",e.target.value)} /></div>
-        <div><label style={S.label}>Role</label><select style={S.input} value={f.role} onChange={e => up("role",e.target.value)}>{CONTACT_TYPES.map(r => <option key={r}>{r}</option>)}</select></div>
-        <div><label style={S.label}>Strategy</label><select style={S.input} value={f.strategy} onChange={e => up("strategy",e.target.value)}>{STRATEGIES.map(s => <option key={s}>{s}</option>)}</select></div>
-        <div><label style={S.label}>Max Budget</label><input style={S.input} type="number" value={f.priceMax} onChange={e => up("priceMax",e.target.value)} /></div>
-        <div><label style={S.label}>Min Beds</label><input style={S.input} type="number" value={f.bedsMin} onChange={e => up("bedsMin",e.target.value)} /></div>
-        <div><label style={S.label}>Min Baths</label><input style={S.input} type="number" value={f.bathsMin} onChange={e => up("bathsMin",e.target.value)} /></div>
-        <div style={{ gridColumn: "1/-1" }}><label style={S.label}>Target Cities (comma-separated)</label><input style={S.input} value={f.geoRequired} onChange={e => up("geoRequired",e.target.value)} /></div>
-        <div style={{ gridColumn: "1/-1" }}><label style={S.label}>Excluded Cities</label><input style={S.input} value={f.geoExclude} onChange={e => up("geoExclude",e.target.value)} /></div>
-        <div><label style={S.label}>Buyer Rep Agreement</label><select style={S.input} value={f.braStatus} onChange={e => up("braStatus",e.target.value)}><option>No</option><option>Yes</option><option>Expired</option></select></div>
-        <div><label style={S.label}>Agreement Expires</label><input style={S.input} type="date" value={f.braExpires} onChange={e => up("braExpires",e.target.value)} /></div>
-        <div><label style={S.label}>Status</label><select style={S.input} value={f.status} onChange={e => up("status",e.target.value)}>{STATUSES.map(s => <option key={s}>{s}</option>)}</select></div>
-        <div><label style={S.label}>Rehab Tolerance</label><input style={S.input} value={f.rehab} onChange={e => up("rehab",e.target.value)} /></div>
-        <div style={{ gridColumn: "1/-1" }}><label style={S.label}>Hard Rules (semicolon-separated)</label><input style={S.input} value={f.hardRules} onChange={e => up("hardRules",e.target.value)} /></div>
-        <div style={{ gridColumn: "1/-1" }}><label style={S.label}>Notes</label><textarea style={{ ...S.input, minHeight: 48 }} value={f.notes} onChange={e => up("notes",e.target.value)} /></div>
+// ── Contact Form ─────────────────────────────────────────────────────────────
+function ContactForm({initial,onSave,onCancel}){
+  const blank={name:"",email:"",phone:"",role:"Investor",strategy:"Any",priceMax:"",bedsMin:"",bathsMin:"",geoReq:"",geoEx:"",subTypes:"SING,MULTI",hardRules:"",braStatus:"No",status:"Warm",notes:""};
+  const[f,setF]=useState(()=>initial?{...initial,geoReq:(initial.geoReq||[]).join(", "),geoEx:(initial.geoEx||[]).join(", "),hardRules:(initial.hardRules||[]).join("; "),subTypes:(initial.subTypes||[]).join(","),priceMax:initial.priceMax||"",bedsMin:initial.bedsMin||"",bathsMin:initial.bathsMin||""}:blank);
+  const up=(k,v)=>setF(p=>({...p,[k]:v}));
+  const inp={width:"100%",padding:"8px 10px",borderRadius:3,border:`1px solid ${C.bdr}`,fontSize:14,fontFamily:F,color:C.ink,boxSizing:"border-box"};
+  const lbl={fontSize:11,fontFamily:FS,fontWeight:600,color:C.inkS,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3,display:"block"};
+  return(
+    <div style={{background:C.wh,border:`1px solid ${C.bdr}`,borderLeft:`3px solid ${C.pri}`,borderRadius:4,padding:"20px 22px",marginBottom:14}}>
+      <div style={{fontSize:16,fontWeight:700,color:C.pri,marginBottom:14}}>{initial?"Edit":"Add"} Contact</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px 14px"}}>
+        <div><label style={lbl}>Name</label><input style={inp} value={f.name} onChange={e=>up("name",e.target.value)}/></div>
+        <div><label style={lbl}>Email</label><input style={inp} value={f.email} onChange={e=>up("email",e.target.value)}/></div>
+        <div><label style={lbl}>Role</label><select style={inp} value={f.role} onChange={e=>up("role",e.target.value)}>{ROLES.map(r=><option key={r}>{r}</option>)}</select></div>
+        <div><label style={lbl}>Strategy</label><select style={inp} value={f.strategy} onChange={e=>up("strategy",e.target.value)}>{STRATEGIES.map(s=><option key={s}>{s}</option>)}</select></div>
+        <div><label style={lbl}>Max Budget</label><input style={inp} type="number" value={f.priceMax} onChange={e=>up("priceMax",e.target.value)}/></div>
+        <div><label style={lbl}>Min Beds</label><input style={inp} type="number" value={f.bedsMin} onChange={e=>up("bedsMin",e.target.value)}/></div>
+        <div><label style={lbl}>Min Baths</label><input style={inp} type="number" value={f.bathsMin} onChange={e=>up("bathsMin",e.target.value)}/></div>
+        <div><label style={lbl}>Status</label><select style={inp} value={f.status} onChange={e=>up("status",e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
+        <div style={{gridColumn:"1/-1"}}><label style={lbl}>Target Cities</label><input style={inp} value={f.geoReq} onChange={e=>up("geoReq",e.target.value)}/></div>
+        <div style={{gridColumn:"1/-1"}}><label style={lbl}>Excluded Cities</label><input style={inp} value={f.geoEx} onChange={e=>up("geoEx",e.target.value)}/></div>
+        <div style={{gridColumn:"1/-1"}}><label style={lbl}>Hard Rules (semicolon-sep)</label><input style={inp} value={f.hardRules} onChange={e=>up("hardRules",e.target.value)}/></div>
+        <div style={{gridColumn:"1/-1"}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:40}} value={f.notes} onChange={e=>up("notes",e.target.value)}/></div>
       </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <button onClick={() => { if (!f.name) return; onSave({ ...f, id: f.id || "C-" + Date.now(), priceMax: parseInt(f.priceMax) || 9999999, bedsMin: parseInt(f.bedsMin) || 0, bathsMin: parseInt(f.bathsMin) || 0, sqftMin: parseInt(f.sqftMin) || 0, geoRequired: f.geoRequired ? f.geoRequired.split(",").map(s => s.trim()).filter(Boolean) : [], geoExclude: f.geoExclude ? f.geoExclude.split(",").map(s => s.trim()).filter(Boolean) : [], hardRules: f.hardRules ? f.hardRules.split(";").map(s => s.trim()).filter(Boolean) : [], subTypes: f.subTypes ? f.subTypes.split(",").map(s => s.trim()).filter(Boolean) : ["SING","MULTI"] }); }} style={S.btnPrimary}>Save</button>
-        <button onClick={onCancel} style={S.btnSecondary}>Cancel</button>
+      <div style={{display:"flex",gap:8,marginTop:14}}>
+        <button onClick={()=>{if(!f.name)return;onSave({...f,id:f.id||"C"+Date.now(),priceMax:parseInt(f.priceMax)||9999999,bedsMin:parseInt(f.bedsMin)||0,bathsMin:parseInt(f.bathsMin)||0,geoReq:f.geoReq?f.geoReq.split(",").map(s=>s.trim()).filter(Boolean):[],geoEx:f.geoEx?f.geoEx.split(",").map(s=>s.trim()).filter(Boolean):[],hardRules:f.hardRules?f.hardRules.split(";").map(s=>s.trim()).filter(Boolean):[],subTypes:f.subTypes?f.subTypes.split(",").map(s=>s.trim()).filter(Boolean):["SING","MULTI"]});}} style={{background:C.pri,color:C.wh,border:"none",borderRadius:3,padding:"9px 20px",fontSize:13,fontWeight:600,fontFamily:FS,cursor:"pointer"}}>Save</button>
+        <button onClick={onCancel} style={{background:"transparent",color:C.inkS,border:`1px solid ${C.bdr}`,borderRadius:3,padding:"8px 18px",fontSize:13,fontFamily:FS,cursor:"pointer"}}>Cancel</button>
       </div>
     </div>
   );
 }
 
-// ── Error Boundary ────────────────────────────────────────────────────────────
-class EB extends Component { constructor(p){super(p);this.state={e:false}} static getDerivedStateFromError(){return{e:true}} render(){if(this.state.e)return<div style={{fontFamily:FONT,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg}}><div style={{background:C.white,padding:40,textAlign:"center",borderRadius:4}}><div style={{fontSize:18,fontWeight:700,color:C.accent,marginBottom:16}}>Something went wrong</div><button onClick={()=>{this.setState({e:false});window.location.reload()}} style={S.btnPrimary}>Reload</button></div></div>;return this.props.children} }
+// ── Error Boundary ───────────────────────────────────────────────────────────
+class EB extends Component{constructor(p){super(p);this.state={e:false}}static getDerivedStateFromError(){return{e:true}}render(){if(this.state.e)return<div style={{fontFamily:F,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg}}><div style={{background:C.wh,padding:40,textAlign:"center",borderRadius:4}}><div style={{fontSize:18,fontWeight:700,color:C.pri,marginBottom:16}}>Something went wrong</div><button onClick={()=>{this.setState({e:false});window.location.reload()}} style={{background:C.pri,color:C.wh,border:"none",borderRadius:3,padding:"10px 24px",fontSize:14,fontFamily:FS,cursor:"pointer"}}>Reload</button></div></div>;return this.props.children}}
 
 // ═══════════════════ MAIN APP ═════════════════════════════════════════════════
-function DealScreener() {
-  const [tab, setTab] = useState("matches");
-  const [listings, setListings] = useState([]);
-  const [results, setResults] = useState({});
-  const [sent, setSent] = useState({});
-  const [contacts, setContacts] = useState(() => JSON.parse(localStorage.getItem("ds_contacts") || "null") || ALL_CONTACTS);
-  const [toasts, setToasts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [listingCount, setListingCount] = useState(0);
-  const [filterContact, setFilterContact] = useState("all");
-  const [filterConf, setFilterConf] = useState("good"); // Default: hide "possible" matches
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [showLegend, setShowLegend] = useState(false);
-  const [thresholds, setThresholds] = useState(() => JSON.parse(localStorage.getItem("ds_thresholds") || "null") || {
-    investorMaxPrice: 200000, fhaMinPrice: 60000, fhaMaxPrice: 250000, fhaMinBeds: 3,
-    moveupMinPrice: 175000, moveupMaxPrice: 400000, moveupMinBeds: 4, moveupMinSqft: 2000,
-    listingMinDOM: 60, minBaths: 0, minSqft: 0
-  });
-  const [expandedGroups, setExpandedGroups] = useState({});
-  const fileRef = useRef(null);
-  const toast = useCallback((msg) => setToasts(p => [...p, { id: Date.now(), msg }]), []);
+function DealScreener(){
+  const[tab,setTab]=useState("matches");
+  const[actives,setActives]=useState([]);
+  const[compData,setCompData]=useState(()=>{try{return JSON.parse(localStorage.getItem("ds6_comp")||"{}");} catch(e){return{};}});
+  const[soldCount,setSoldCount]=useState(()=>parseInt(localStorage.getItem("ds6_soldN")||"0"));
+  const[soldDate,setSoldDate]=useState(()=>localStorage.getItem("ds6_soldD")||"");
+  const[results,setResults]=useState({});
+  const[sent]=useState({});
+  const[contacts,setContacts]=useState(()=>{try{const s=localStorage.getItem("ds6_ct");return s?JSON.parse(s):DEF_CT;}catch(e){return DEF_CT;}});
+  const[toasts,setToasts]=useState([]);
+  const[filterCt,setFilterCt]=useState("all");
+  const[filterG,setFilterG]=useState("B");
+  const[showForm,setShowForm]=useState(false);
+  const[editId,setEditId]=useState(null);
+  const[expanded,setExpanded]=useState({});
+  const toast=useCallback(m=>setToasts(p=>[...p,{id:Date.now(),m}]),[]);
+  const saveCt=c=>{setContacts(c);localStorage.setItem("ds6_ct",JSON.stringify(c));};
 
-  useEffect(() => {
-    (async () => { try { const r = await fetch("/.netlify/functions/data?action=sent_mls_list",{signal:AbortSignal.timeout(8000)}); if(r.ok){setSent(await r.json());return;} }catch(e){} setSent(JSON.parse(localStorage.getItem("ds_sent_log")||"{}")); })();
-  }, []);
+  // Toast auto-dismiss
+  useEffect(()=>{if(toasts.length>0){const t=setTimeout(()=>setToasts(p=>p.slice(1)),3500);return()=>clearTimeout(t);}},[toasts]);
 
-  useEffect(() => { if (listings.length) { setResults(matchAll(listings, contacts, sent)); } }, [contacts, sent, listings]);
-  const saveContacts = (c) => { setContacts(c); localStorage.setItem("ds_contacts", JSON.stringify(c)); };
+  // Re-match when dependencies change
+  useEffect(()=>{if(actives.length)setResults(matchAll(actives,contacts,compData,sent));},[contacts,actives,compData,sent]);
 
-  const handleUpload = (e) => {
-    const file = e.target.files[0]; if (!file) return; setLoading(true);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const parsed = parseCSV(ev.target.result);
-      if (!parsed.length) { toast("No valid listings found"); setLoading(false); return; }
-      setListings(parsed); setListingCount(parsed.length);
-      const r = matchAll(parsed, contacts, sent); setResults(r);
-      const total = Object.values(r).reduce((s, x) => s + x.matches.length, 0);
-      toast(`${parsed.length} listings screened — ${total} matches found`);
-      setLoading(false); setTab("matches");
-    };
-    reader.readAsText(file); e.target.value = "";
+  // Sold freshness
+  const soldDays=soldDate?Math.floor((Date.now()-new Date(soldDate).getTime())/86400000):999;
+  const soldAlert=soldDays>35?{m:"Sold comps are "+soldDays+" days old — refresh",c:C.red}:soldDays>25?{m:"Refresh recommended ("+soldDays+" days)",c:C.amb}:null;
+
+  const handleActive=(text,name)=>{
+    const parsed=parseCSV(text).filter(r=>!r.isSold);
+    if(!parsed.length){toast("No active listings in "+name);return;}
+    setActives(prev=>{const map={};prev.forEach(l=>{map[l.key]=l;});parsed.forEach(l=>{map[l.key]=l;});return Object.values(map);});
+    toast(parsed.length+" active listings from "+name);
   };
 
-  const stats = useMemo(() => {
-    let t = 0, s = 0, g = 0, c = 0;
-    Object.values(results).forEach(r => { c++; r.matches.forEach(m => { t++; if (m.confidence==="strong") s++; if (m.confidence==="good") g++; }); });
-    return { total: t, strong: s, good: g, possible: t - s - g, contacts: c };
-  }, [results]);
-
-  const contactsWithMatches = useMemo(() => Object.values(results).map(r => r.contact).sort((a, b) => a.name.localeCompare(b.name)), [results]);
-
-  const investors = contacts.filter(c => c.role === "Investor");
-  const buyers = contacts.filter(c => c.role === "Buyer");
-  const sellers = contacts.filter(c => c.role === "Seller");
-  const wholesalers = contacts.filter(c => c.role === "Wholesaler");
-
-  const toggleGroup = (id) => setExpandedGroups(p => ({ ...p, [id]: !p[id] }));
-
-  const handleSaveContact = (c) => {
-    const updated = editId ? contacts.map(x => x.id === editId ? c : x) : [...contacts, c];
-    saveContacts(updated); setShowForm(false); setEditId(null);
-    toast(editId ? `${c.name} updated` : `${c.name} added`);
+  const handleSold=(text,name)=>{
+    const parsed=parseCSV(text);
+    const sold=parsed.filter(r=>r.isSold||r.closePrice>0);
+    if(!sold.length){toast("No sold data in "+name);return;}
+    // Accumulate with previous
+    const prev=JSON.parse(localStorage.getItem("ds6_soldRaw")||"[]");
+    const map={};prev.forEach(l=>{map[l.key]=l;});sold.forEach(l=>{map[l.key]=l;});
+    const combined=Object.values(map);
+    localStorage.setItem("ds6_soldRaw",JSON.stringify(combined));
+    const cd=buildCompData(combined);
+    setCompData(cd);localStorage.setItem("ds6_comp",JSON.stringify(cd));
+    setSoldCount(combined.length);localStorage.setItem("ds6_soldN",String(combined.length));
+    const today=new Date().toLocaleDateString("en-US");setSoldDate(today);localStorage.setItem("ds6_soldD",today);
+    toast(sold.length+" sold comps — "+Object.keys(cd).length+" zips mapped");
   };
 
-  const handleDeleteContact = (id) => {
-    if (!window.confirm("Remove this contact?")) return;
-    saveContacts(contacts.filter(c => c.id !== id)); toast("Contact removed");
-  };
+  const stats=useMemo(()=>{let t=0,a=0,b=0,ct=0;Object.values(results).forEach(r=>{ct++;r.matches.forEach(m=>{t++;if(m.grade==="A")a++;if(m.grade==="B")b++;});});return{t,a,b,c:t-a-b,ct};},[results]);
 
-  const TABS = [
-    { id: "matches", label: "Matches", count: stats.total },
-    { id: "contacts", label: "Contacts", count: contacts.length },
-    { id: "settings", label: "Settings", count: 0 },
-  ];
+  const GRADES={A:{c:C.grn,bg:C.grnS,l:"Send Now"},B:{c:C.amb,bg:C.ambS,l:"Worth a Look"},C:{c:C.inkS,bg:C.bdrL,l:"Watchlist"},D:{c:C.inkM,bg:C.off,l:"Skip"}};
+  const pill=(bg,fg,t)=><span style={{display:"inline-block",background:bg,color:fg,borderRadius:2,padding:"2px 8px",fontSize:11,fontWeight:600,fontFamily:FS}}>{t}</span>;
+  const dot=c=><span style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:c}}/>;
+  const divEl=<span style={{display:"inline-block",width:1,height:12,background:C.bdr,margin:"0 8px",verticalAlign:"middle"}}/>;
 
-  return (
-    <div style={S.app}>
-      {/* ── Header ── */}
-      <div style={{ background: `linear-gradient(135deg, ${C.accent}, #0F2440)`, padding: "0 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, height: 64 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <img src="/headshot.png" alt="" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.2)" }} onError={e => { e.target.style.display = "none"; }} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 17, color: C.white, letterSpacing: "0.02em" }}>Deal Screener</div>
-            <div style={{ fontSize: 10, fontFamily: SANS, color: "rgba(255,255,255,0.45)", letterSpacing: "0.15em", textTransform: "uppercase" }}>Dr. Gina N. Eaton · Howard Hanna</div>
+  const TABS=[{id:"matches",l:"Matches"},{id:"contacts",l:"Contacts"}];
+
+  return(
+    <div style={{fontFamily:F,background:C.bg,minHeight:"100vh",color:C.ink}}>
+      {/* Header */}
+      <div style={{background:`linear-gradient(135deg,${C.pri},#0F2440)`,padding:"0 28px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <img src="/headshot.png" alt="" style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,255,255,0.2)"}} onError={e=>{e.target.style.display="none";}}/>
+          <div><div style={{fontWeight:700,fontSize:17,color:C.wh}}>Deal Screener</div><div style={{fontSize:10,fontFamily:FS,color:"rgba(255,255,255,0.4)",letterSpacing:"0.15em",textTransform:"uppercase"}}>Dr. Gina N. Eaton · Howard Hanna</div></div>
+        </div>
+        {actives.length>0&&<span style={{fontSize:13,fontFamily:FS,color:"rgba(255,255,255,0.5)"}}>{actives.length} active · {soldCount} sold comps</span>}
+      </div>
+      <div style={{height:2,background:`linear-gradient(90deg,${C.gold},${C.goldL},transparent)`}}/>
+      {/* Tabs */}
+      <div style={{background:C.wh,borderBottom:`1px solid ${C.bdr}`,display:"flex",padding:"0 28px"}}>
+        {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${C.pri}`:"2px solid transparent",padding:"12px 18px",fontSize:14,fontWeight:tab===t.id?700:400,fontFamily:FS,color:tab===t.id?C.pri:C.inkM,cursor:"pointer"}}>{t.l}</button>)}
+      </div>
+
+      <div style={{padding:"20px 28px 80px",maxWidth:960,margin:"0 auto"}}>
+        {/* MATCHES */}
+        {tab==="matches"&&<>
+          {/* Upload Zones */}
+          <div style={{display:"flex",gap:16,marginBottom:20}}>
+            <DropZone label="Active Listings" sub="Drop your MLS Active export CSV(s)" count={actives.length} onFiles={handleActive} accent={C.pri}/>
+            <DropZone label="Sold Comps" sub="6-month Sold export for ARV data" count={soldCount} lastDate={soldDate} alert={soldAlert?.m} alertC={soldAlert?.c} onFiles={handleSold} accent={C.gold}/>
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {listingCount > 0 && <span style={{ fontSize: 12, fontFamily: SANS, color: "rgba(255,255,255,0.5)" }}>{listingCount} listings loaded</span>}
-          <input ref={fileRef} type="file" accept=".csv" onChange={handleUpload} style={{ display: "none" }} />
-          <button onClick={() => fileRef.current?.click()} style={{ ...S.btnPrimary, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 13, padding: "8px 18px" }}>
-            {loading ? "Screening..." : "Upload CSV"}
-          </button>
-        </div>
-      </div>
-      <div style={{ height: 2, background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight}, transparent)` }} />
 
-      {/* ── Tab Bar ── */}
-      <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, display: "flex", padding: "0 28px", gap: 0 }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ background: "none", border: "none", borderBottom: tab === t.id ? `2px solid ${C.accent}` : "2px solid transparent", padding: "14px 20px 12px", fontSize: 14, fontWeight: tab === t.id ? 700 : 400, fontFamily: SANS, color: tab === t.id ? C.accent : C.inkMuted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-            {t.label}
-            {t.count > 0 && <span style={{ fontFamily: MONO, fontSize: 11, color: tab === t.id ? C.accent : C.inkMuted, fontWeight: 600 }}>{t.count}</span>}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        <button onClick={() => setShowLegend(!showLegend)} style={{ ...S.btnSecondary, border: "none", fontSize: 12, color: C.inkMuted, padding: "8px 12px" }}>
-          {showLegend ? "Hide Guide" : "Status Guide"}
-        </button>
-      </div>
+          {actives.length>0&&<>
+            {/* Comp data notice */}
+            {Object.keys(compData).length>0?
+              <div style={{fontSize:12,fontFamily:FS,color:C.grn,marginBottom:12}}>Sold comp data loaded: {Object.keys(compData).length} zip codes mapped · Realist AVM available on 95% of listings</div>:
+              <div style={{fontSize:12,fontFamily:FS,color:C.amb,marginBottom:12,fontWeight:600}}>Upload Sold Comps for ARV comparison data. Using Realist AVM as primary valuation.</div>}
 
-      {/* ── Legend ── */}
-      {showLegend && (
-        <div style={{ background: C.offWhite, borderBottom: `1px solid ${C.border}`, padding: "14px 28px", display: "flex", gap: 24, flexWrap: "wrap" }}>
-          {STATUSES.map(s => (
-            <div key={s} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontFamily: SANS }}>
-              <div style={S.dot(STATUS_DEF[s].color)} />
-              <span style={{ fontWeight: 600, color: C.ink }}>{s}</span>
-              <span style={{ color: C.inkMuted }}>— {STATUS_DEF[s].desc}</span>
+            {/* Stats */}
+            <div style={{display:"flex",gap:12,marginBottom:16}}>
+              {[{l:"Grade A",n:stats.a,c:C.grn},{l:"Grade B",n:stats.b,c:C.amb},{l:"Grade C",n:stats.c,c:C.inkS},{l:"Contacts",n:stats.ct,c:C.pri}].map(s=>
+                <div key={s.l} style={{flex:1,background:C.wh,border:`1px solid ${C.bdr}`,borderRadius:4,padding:"12px 16px"}}>
+                  <div style={{fontSize:10,fontFamily:FS,fontWeight:600,color:C.inkM,textTransform:"uppercase",letterSpacing:"0.08em"}}>{s.l}</div>
+                  <div style={{fontFamily:FM,fontSize:24,fontWeight:700,color:s.c,marginTop:2}}>{s.n}</div>
+                </div>)}
             </div>
-          ))}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontFamily: SANS }}>
-            <span style={{ fontWeight: 600, color: C.green }}>Strong</span><span style={{ color: C.inkMuted }}>3+ signals</span>
-            <span style={{ fontWeight: 600, color: C.amber, marginLeft: 12 }}>Good</span><span style={{ color: C.inkMuted }}>2 signals</span>
-            <span style={{ fontWeight: 600, color: C.inkMuted, marginLeft: 12 }}>Possible</span><span style={{ color: C.inkMuted }}>1 signal</span>
-          </div>
-        </div>
-      )}
 
-      {/* ── Content ── */}
-      <div style={{ padding: "24px 28px 80px", maxWidth: 960, margin: "0 auto" }}>
-
-        {/* ═══ MATCHES ═══ */}
-        {tab === "matches" && (
-          <div>
-            {listings.length === 0 ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "60px 40px" }}>
-                <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 600, color: C.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Deal Screener</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: C.ink, marginBottom: 12 }}>Upload your MLS export to find matches</div>
-                <div style={{ fontSize: 15, color: C.inkSoft, marginBottom: 28, lineHeight: 1.7, maxWidth: 480, margin: "0 auto 28px" }}>
-                  Export an Agent Single Line CSV from Matrix. The screener checks every listing against your {contacts.filter(c=>c.role!=="Wholesaler").length} contacts and surfaces the deals worth sending.
-                </div>
-                <button onClick={() => fileRef.current?.click()} style={{ ...S.btnPrimary, fontSize: 15, padding: "12px 32px" }}>Upload CSV</button>
+            {/* Filters */}
+            <div style={{display:"flex",gap:14,marginBottom:18,alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:12,fontFamily:FS,fontWeight:600,color:C.inkS}}>Grade:</span>
+                <select value={filterG} onChange={e=>setFilterG(e.target.value)} style={{padding:"6px 10px",borderRadius:3,border:`1px solid ${C.bdr}`,fontSize:13,fontFamily:FS}}>
+                  <option value="A">A only — Send Now</option>
+                  <option value="B">A + B — Worth a Look</option>
+                  <option value="C">A + B + C</option>
+                  <option value="all">Show all</option>
+                </select>
               </div>
-            ) : (
-              <>
-                {/* Summary */}
-                <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-                  <div style={{ flex: 1, ...S.card, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: C.inkMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Total Matches</div>
-                    <div style={{ fontFamily: MONO, fontSize: 28, fontWeight: 700, color: C.accent, marginTop: 2 }}>{stats.total}</div>
-                  </div>
-                  <div style={{ flex: 1, ...S.card, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: C.inkMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Strong</div>
-                    <div style={{ fontFamily: MONO, fontSize: 28, fontWeight: 700, color: C.green, marginTop: 2 }}>{stats.strong}</div>
-                  </div>
-                  <div style={{ flex: 1, ...S.card, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: C.inkMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Good</div>
-                    <div style={{ fontFamily: MONO, fontSize: 28, fontWeight: 700, color: C.amber, marginTop: 2 }}>{stats.good}</div>
-                  </div>
-                  <div style={{ flex: 1, ...S.card, padding: "16px 20px" }}>
-                    <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: C.inkMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Contacts</div>
-                    <div style={{ fontFamily: MONO, fontSize: 28, fontWeight: 700, color: C.ink, marginTop: 2 }}>{stats.contacts}</div>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <label style={{ fontSize: 13, fontFamily: SANS, fontWeight: 600, color: C.inkSoft }}>Contact:</label>
-                    <select value={filterContact} onChange={e => setFilterContact(e.target.value)} style={{ ...S.input, width: "auto", minWidth: 200, fontSize: 13, fontFamily: SANS }}>
-                      <option value="all">All contacts ({stats.total} matches)</option>
-                      {contactsWithMatches.map(c => {
-                        const count = results[c.id]?.matches.length || 0;
-                        return <option key={c.id} value={c.id}>{c.name} — {c.role} ({count})</option>;
-                      })}
-                    </select>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <label style={{ fontSize: 13, fontFamily: SANS, fontWeight: 600, color: C.inkSoft }}>Quality:</label>
-                    <select value={filterConf} onChange={e => setFilterConf(e.target.value)} style={{ ...S.input, width: "auto", fontSize: 13, fontFamily: SANS }}>
-                      <option value="strong">Strong only</option>
-                      <option value="good">Strong + Good</option>
-                      <option value="all">Show all (including Possible)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Match Groups */}
-                {Object.keys(results).length === 0 ? (
-                  <div style={{ ...S.card, textAlign: "center", padding: 40, color: C.inkSoft }}>
-                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No matches found</div>
-                    <div style={{ fontSize: 14 }}>Try adjusting buy boxes or uploading listings from a different area.</div>
-                  </div>
-                ) : (
-                  Object.values(results)
-                    .filter(r => filterContact === "all" || r.contact.id === filterContact)
-                    .map(r => {
-                      const confOrder = { strong: 0, good: 1, possible: 2 };
-                      const minConf = filterConf === "strong" ? 0 : filterConf === "good" ? 1 : 2;
-                      const filtered = r.matches.filter(m => (confOrder[m.confidence] || 2) <= minConf);
-                      return { ...r, matches: filtered };
-                    })
-                    .filter(r => r.matches.length > 0)
-                    .sort((a, b) => b.matches.filter(m => m.confidence === "strong").length - a.matches.filter(m => m.confidence === "strong").length || b.matches.length - a.matches.length)
-                    .map(({ contact: ct, matches: mx }) => {
-                      const open = expandedGroups[ct.id] !== false;
-                      const sc = mx.filter(m => m.confidence === "strong").length;
-                      return (
-                        <div key={ct.id} style={{ marginBottom: 16 }}>
-                          <div onClick={() => toggleGroup(ct.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", background: C.white, border: `1px solid ${C.border}`, borderBottom: open ? "none" : `1px solid ${C.border}`, borderRadius: open ? "4px 4px 0 0" : 4, cursor: "pointer" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <div style={S.dot(STATUS_DEF[ct.status]?.color || C.inkMuted)} />
-                              <span style={{ fontWeight: 700, fontSize: 16, color: C.ink }}>{ct.name}</span>
-                              <span style={S.pill(C.borderLight, C.inkSoft)}>{ct.role}</span>
-                              <span style={{ fontSize: 13, fontFamily: SANS, color: C.inkMuted }}>{ct.strategy}</span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              {sc > 0 && <span style={S.pill(C.greenSoft, C.green)}>{sc} strong</span>}
-                              <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.ink }}>{mx.length}</span>
-                              <span style={{ fontSize: 12, color: C.inkMuted, fontFamily: SANS }}>{open ? "▾" : "▸"}</span>
-                            </div>
-                          </div>
-                          {open && (
-                            <div style={{ border: `1px solid ${C.border}`, borderTop: "none", borderRadius: "0 0 4px 4px", padding: "12px 16px", background: C.offWhite }}>
-                              {ct.hardRules?.length > 0 && (
-                                <div style={{ fontSize: 12, fontFamily: SANS, color: C.amber, fontWeight: 600, padding: "8px 12px", background: C.amberSoft, borderRadius: 3, marginBottom: 10 }}>
-                                  Hard Rules: {ct.hardRules.join(" · ")}
-                                </div>
-                              )}
-                              {mx.map((m, i) => {
-                                const confColor = m.confidence === "strong" ? C.green : m.confidence === "good" ? C.amber : C.inkMuted;
-                                return (
-                                  <div key={m.mls + i} style={{ ...S.card, borderLeft: `3px solid ${confColor}`, marginBottom: 8, padding: "14px 18px" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                      <div>
-                                        <div style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>{m.address}</div>
-                                        <div style={{ fontSize: 13, fontFamily: SANS, color: C.inkSoft }}>{m.city}, OH {m.zip}</div>
-                                      </div>
-                                      <div style={{ textAlign: "right" }}>
-                                        <div style={S.price}>{fmtP(m.price)}</div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end", marginTop: 2 }}>
-                                          <div style={S.dot(confColor)} />
-                                          <span style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: confColor, textTransform: "uppercase", letterSpacing: "0.05em" }}>{m.confidence}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", marginTop: 8, fontSize: 13, fontFamily: SANS, color: C.inkSoft }}>
-                                      <span>{m.beds} bed</span><div style={S.divider} />
-                                      <span>{m.baths} bath ({m.fullBaths}F/{m.halfBaths}H)</span><div style={S.divider} />
-                                      {m.sqft > 0 && <><span>{m.sqft.toLocaleString()} sqft</span><div style={S.divider} /></>}
-                                      <span>{m.yearBuilt || "—"}</span><div style={S.divider} />
-                                      <span>{m.dom} days on market</span>
-                                      {m.ppsf > 0 && <><div style={S.divider} /><span>{fmtP(m.ppsf)}/sqft</span></>}
-                                      {m.taxes > 0 && <><div style={S.divider} /><span>Tax: {fmtP(m.taxes)}/yr</span></>}
-                                    </div>
-                                    {m.fmr > 0 && <div style={{ fontSize: 12, fontFamily: SANS, color: C.blue, marginTop: 6 }}>Est. rent: {fmtP(m.fmr)}/mo · MLS# {m.mls} · {m.subType}</div>}
-                                    <div style={{ marginTop: 8 }}>
-                                      {m.signals.map((sg, si) => (
-                                        <span key={si} style={{ ...S.pill(C.greenSoft, C.green), marginRight: 6, marginBottom: 4 }}>{sg.l}</span>
-                                      ))}
-                                    </div>
-                                    {m.alreadySent && <div style={{ ...S.pill(C.greenSoft, C.green), marginTop: 6 }}>Sent to: {m.sentTo.join(", ")}</div>}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ═══ CONTACTS ═══ */}
-        {tab === "contacts" && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: C.ink }}>Contacts</div>
-              <button onClick={() => { setShowForm(true); setEditId(null); }} style={S.btnPrimary}>+ Add Contact</button>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:12,fontFamily:FS,fontWeight:600,color:C.inkS}}>Contact:</span>
+                <select value={filterCt} onChange={e=>setFilterCt(e.target.value)} style={{padding:"6px 10px",borderRadius:3,border:`1px solid ${C.bdr}`,fontSize:13,fontFamily:FS,maxWidth:220}}>
+                  <option value="all">All contacts</option>
+                  {Object.values(results).sort((a,b)=>a.contact.name.localeCompare(b.contact.name)).map(r=><option key={r.contact.id} value={r.contact.id}>{r.contact.name} ({r.matches.length})</option>)}
+                </select>
+              </div>
             </div>
-            {(showForm || editId) && <ContactForm initial={editId ? contacts.find(c => c.id === editId) : null} onSave={handleSaveContact} onCancel={() => { setShowForm(false); setEditId(null); }} />}
 
-            {[{ label: "Investors", items: investors }, { label: "Buyers", items: buyers }, { label: "Sellers", items: sellers }, { label: "Wholesalers", items: wholesalers }]
-              .filter(g => g.items.length > 0)
-              .map(group => (
-                <div key={group.label} style={{ marginBottom: 24 }}>
-                  <div style={S.sectionLabel}>{group.label} ({group.items.length})</div>
-                  {group.items.map(c => (
-                    <div key={c.id} style={{ ...S.card, display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "14px 20px" }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                          <div style={S.dot(STATUS_DEF[c.status]?.color || C.inkMuted)} />
-                          <span style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>{c.name}</span>
-                          <span style={S.pill(C.borderLight, C.inkSoft)}>{c.strategy}</span>
-                          {c.braStatus === "Yes" && <span style={S.pill(C.greenSoft, C.green)}>Buyer Rep ✓</span>}
-                        </div>
-                        <div style={{ fontSize: 13, fontFamily: SANS, color: C.inkSoft, marginLeft: 15 }}>
-                          {c.email}{c.phone ? ` · ${c.phone}` : ""} · Max: {fmtP(c.priceMax || 0)}
-                          {c.bedsMin > 0 ? ` · ${c.bedsMin}+ bed` : ""}
-                          {c.bathsMin > 0 ? ` · ${c.bathsMin}+ bath` : ""}
-                        </div>
-                        {c.geoRequired?.length > 0 && <div style={{ fontSize: 12, fontFamily: SANS, color: C.blue, marginLeft: 15, marginTop: 2 }}>Target: {c.geoRequired.join(", ")}</div>}
-                        {c.geoExclude?.length > 0 && <div style={{ fontSize: 12, fontFamily: SANS, color: C.red, marginLeft: 15, marginTop: 2 }}>Excludes: {c.geoExclude.join(", ")}</div>}
-                        {c.hardRules?.length > 0 && <div style={{ fontSize: 12, fontFamily: SANS, color: C.amber, marginLeft: 15, marginTop: 2 }}>Rules: {c.hardRules.join(" · ")}</div>}
-                        {c.notes && <div style={{ fontSize: 12, fontFamily: SANS, color: C.inkMuted, marginLeft: 15, marginTop: 3, fontStyle: "italic" }}>{c.notes}</div>}
+            {/* Match Groups */}
+            {Object.values(results).filter(r=>filterCt==="all"||r.contact.id===filterCt).map(r=>{
+              const go={A:0,B:1,C:2,D:3};const maxG=filterG==="all"?3:go[filterG]??1;
+              const filtered=r.matches.filter(m=>(go[m.grade]??9)<=maxG);
+              if(!filtered.length)return null;
+              const ct=r.contact;const isOpen=expanded[ct.id]!==false;
+              const aC=filtered.filter(m=>m.grade==="A").length;
+              return(<div key={ct.id} style={{marginBottom:14}}>
+                <div onClick={()=>setExpanded(p=>({...p,[ct.id]:!isOpen}))} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 18px",background:C.wh,border:`1px solid ${C.bdr}`,borderRadius:isOpen?"4px 4px 0 0":4,cursor:"pointer"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    {dot(STAT_C[ct.status]||C.inkM)}
+                    <span style={{fontWeight:700,fontSize:15}}>{ct.name}</span>
+                    {pill(C.bdrL,C.inkS,ct.role)}
+                    <span style={{fontSize:12,fontFamily:FS,color:C.inkM}}>{ct.strategy} · Max {$f(ct.priceMax||0)}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    {aC>0&&pill(C.grnS,C.grn,aC+" Grade A")}
+                    <span style={{fontFamily:FM,fontSize:14,fontWeight:700}}>{filtered.length}</span>
+                    <span style={{fontSize:12,color:C.inkM}}>{isOpen?"▾":"▸"}</span>
+                  </div>
+                </div>
+                {isOpen&&<div style={{border:`1px solid ${C.bdr}`,borderTop:"none",borderRadius:"0 0 4px 4px",padding:"10px 14px",background:C.off}}>
+                  {ct.hardRules?.length>0&&<div style={{fontSize:12,fontFamily:FS,color:C.amb,fontWeight:600,padding:"6px 10px",background:C.ambS,borderRadius:3,marginBottom:8}}>Rules: {ct.hardRules.join(" · ")}</div>}
+                  {filtered.map((m,i)=>{
+                    const G=GRADES[m.grade];
+                    return(<div key={m.key+i} style={{background:C.wh,border:`1px solid ${C.bdr}`,borderLeft:`3px solid ${G.c}`,borderRadius:4,padding:"14px 16px",marginBottom:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                        <div><div style={{fontWeight:700,fontSize:15}}>{m.addr}</div><div style={{fontSize:12,fontFamily:FS,color:C.inkS}}>{m.city}, OH {m.zip} · {m.county} County</div></div>
+                        <div style={{textAlign:"right"}}><div style={{fontFamily:FM,fontWeight:700,fontSize:18,color:C.pri}}>{$f(m.price)}</div>{pill(G.bg,G.c,"Grade "+m.grade+" — "+G.l)}</div>
                       </div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                        <button onClick={() => { setEditId(c.id); setShowForm(false); }} style={S.btnSecondary}>Edit</button>
-                        <button onClick={() => handleDeleteContact(c.id)} style={S.btnDanger}>Remove</button>
+                      {/* Property Details */}
+                      <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",marginTop:8,fontSize:13,fontFamily:FS,color:C.inkS}}>
+                        <span>{m.beds}bd/{m.baths}ba</span>{divEl}
+                        {m.sqft>0&&<><span>{m.sqft.toLocaleString()}sf</span>{divEl}</>}
+                        <span>{m.yr||"—"}</span>{divEl}
+                        <span>{m.dom}d on market</span>
+                        {m.ppsf>0&&<>{divEl}<span>{$f(m.ppsf)}/sf</span></>}
+                        {m.tax>0&&<>{divEl}<span>Tax:{$f(m.tax)}/yr</span></>}
+                        {m.reduced&&<>{divEl}<span style={{color:C.red,fontWeight:600}}>↓{m.dropPct}%</span></>}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-          </div>
-        )}
+                      {/* Details row 2 */}
+                      <div style={{fontSize:12,fontFamily:FS,color:C.inkS,marginTop:4}}>
+                        {m.style}{m.stories?" · "+m.stories+" story":""}{m.basement?" · Bsmt: "+m.basement:""}{m.garage>0?" · "+m.garage+" garage":""}
+                        {m.subTypeFull?" · "+m.subTypeFull:""}
+                        {m.condition?" · "+m.condition:""}
+                      </div>
+                      {/* Valuation */}
+                      {m.arv>0&&<div style={{fontSize:12,fontFamily:FS,color:C.blu,marginTop:6}}>
+                        Est. Value: {$f(m.arv)}{m.avm>0?" (Realist AVM)":compData[m.zip]?" (area comp avg)":""} · {m.arv>m.price?"Priced "+Math.round((1-m.price/m.arv)*100)+"% below":"At or above est. value"}
+                      </div>}
+                      {/* Rent estimate */}
+                      <div style={{fontSize:12,fontFamily:FS,color:C.inkS,marginTop:2}}>
+                        Est. rent: {$f(m.rent)}/mo ({m.grossRent>0?"MLS actual":"FMR estimate"})
+                        {m.occupant?" · Occupant: "+m.occupant:""}
+                        {m.homestead==="Yes"?" · ⚠ Homestead exemption (taxes will increase)":""}
+                      </div>
+                      {/* Signals */}
+                      <div style={{marginTop:6}}>{m.sigs.filter(s=>s.w>0).map((s,si)=><span key={si} style={{display:"inline-block",background:C.grnS,color:C.grn,borderRadius:2,padding:"2px 8px",fontSize:11,fontWeight:600,fontFamily:FS,marginRight:4,marginBottom:3}}>{s.l}</span>)}</div>
+                      {/* Red flags */}
+                      {(m.foreclosure==="Yes"||m.courtOrdered==="Yes"||(m.assocYN==="Yes"&&m.subType==="CONDO")||m.homestead==="Yes")&&
+                        <div style={{marginTop:4}}>
+                          {m.foreclosure==="Yes"&&pill(C.redS,C.red,"Foreclosure")}
+                          {m.courtOrdered==="Yes"&&pill(C.ambS,C.amb,"Court Ordered")}
+                          {m.assocYN==="Yes"&&m.subType==="CONDO"&&pill(C.ambS,C.amb,"Condo — HOA")}
+                          {m.homestead==="Yes"&&pill(C.ambS,C.amb,"Homestead — taxes will rise")}
+                        </div>}
+                      {m.school&&<div style={{fontSize:11,fontFamily:FS,color:C.inkM,marginTop:4}}>School: {m.school}</div>}
+                      {/* Zillow link */}
+                      <div style={{marginTop:6}}><a href={"https://www.zillow.com/homes/"+encodeURIComponent(m.addr+" "+m.city+" OH "+m.zip)} target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontFamily:FS,color:C.blu,textDecoration:"none"}}>View on Zillow →</a></div>
+                    </div>);
+                  })}
+                </div>}
+              </div>);
+            })}
+          </>}
+        </>}
 
-        {/* ═══ SETTINGS ═══ */}
-        {tab === "settings" && (
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 20 }}>Screening Settings</div>
-            {[
-              { label: "Investor Lane", fields: [{ key: "investorMaxPrice", name: "Max Price" }]},
-              { label: "First-Time Buyer Lane", fields: [{ key: "fhaMinPrice", name: "Min Price" },{ key: "fhaMaxPrice", name: "Max Price" },{ key: "fhaMinBeds", name: "Min Beds" }]},
-              { label: "Move-Up Buyer Lane", fields: [{ key: "moveupMinPrice", name: "Min Price" },{ key: "moveupMaxPrice", name: "Max Price" },{ key: "moveupMinBeds", name: "Min Beds" },{ key: "moveupMinSqft", name: "Min SqFt" }]},
-              { label: "Listing Lead Lane", fields: [{ key: "listingMinDOM", name: "Min Days on Market" }]},
-              { label: "Global Filters", fields: [{ key: "minBaths", name: "Min Baths" },{ key: "minSqft", name: "Min SqFt" }]},
-            ].map(section => (
-              <div key={section.label} style={{ ...S.card, marginBottom: 14 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.accent, marginBottom: 12 }}>{section.label}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                  {section.fields.map(f => (
-                    <div key={f.key}><label style={S.label}>{f.name}</label>
-                      <input style={S.input} type="number" value={thresholds[f.key] || 0} onChange={e => {
-                        const u = { ...thresholds, [f.key]: parseInt(e.target.value) || 0 };
-                        setThresholds(u); localStorage.setItem("ds_thresholds", JSON.stringify(u));
-                      }} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <div style={{ ...S.card }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.accent, marginBottom: 8 }}>About</div>
-              <div style={{ fontSize: 14, fontFamily: SANS, color: C.inkSoft, lineHeight: 1.7 }}>
-                Deal Screener V3 — The Real Estate Doc<br/>
-                Dr. Gina N. Eaton, Ph.D., REALTOR®<br/>
-                Howard Hanna Real Estate Services · Equal Housing Opportunity
-              </div>
-            </div>
+        {/* CONTACTS */}
+        {tab==="contacts"&&<div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{fontSize:20,fontWeight:700}}>Contacts ({contacts.length})</div>
+            <button onClick={()=>{setShowForm(true);setEditId(null);}} style={{background:C.pri,color:C.wh,border:"none",borderRadius:3,padding:"9px 20px",fontSize:13,fontWeight:600,fontFamily:FS,cursor:"pointer"}}>+ Add Contact</button>
           </div>
-        )}
-
+          {(showForm||editId)&&<ContactForm initial={editId?contacts.find(c=>c.id===editId):null} onSave={c=>{const u=editId?contacts.map(x=>x.id===editId?c:x):[...contacts,c];saveCt(u);setShowForm(false);setEditId(null);toast(c.name+(editId?" updated":" added"));}} onCancel={()=>{setShowForm(false);setEditId(null);}}/>}
+          {ROLES.map(role=>{
+            const items=contacts.filter(c=>c.role===role);
+            if(!items.length)return null;
+            return(<div key={role} style={{marginBottom:20}}>
+              <div style={{fontSize:10,fontFamily:FS,fontWeight:700,color:C.inkM,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>{role}s ({items.length})</div>
+              {items.map(c=>(
+                <div key={c.id} style={{background:C.wh,border:`1px solid ${C.bdr}`,borderRadius:4,padding:"12px 18px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>{dot(STAT_C[c.status]||C.inkM)}<span style={{fontWeight:700,fontSize:15}}>{c.name}</span>{pill(C.bdrL,C.inkS,c.strategy)}{c.braStatus==="Yes"&&pill(C.grnS,C.grn,"BRA ✓")}</div>
+                    <div style={{fontSize:12,fontFamily:FS,color:C.inkS,marginLeft:13}}>{c.email} · Max: {$f(c.priceMax||0)}{c.bedsMin>0?" · "+c.bedsMin+"+bd":""}{c.bathsMin>0?" · "+c.bathsMin+"+ba":""}</div>
+                    {c.geoReq?.length>0&&<div style={{fontSize:11,fontFamily:FS,color:C.blu,marginLeft:13,marginTop:2}}>Target: {c.geoReq.join(", ")}</div>}
+                    {c.geoEx?.length>0&&<div style={{fontSize:11,fontFamily:FS,color:C.red,marginLeft:13}}>Excludes: {c.geoEx.join(", ")}</div>}
+                    {c.hardRules?.length>0&&<div style={{fontSize:11,fontFamily:FS,color:C.amb,marginLeft:13}}>Rules: {c.hardRules.join(" · ")}</div>}
+                    {c.notes&&<div style={{fontSize:11,fontFamily:FS,color:C.inkM,marginLeft:13,fontStyle:"italic"}}>{c.notes}</div>}
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>{setEditId(c.id);setShowForm(false);}} style={{background:"transparent",color:C.inkS,border:`1px solid ${C.bdr}`,borderRadius:3,padding:"6px 14px",fontSize:12,fontFamily:FS,cursor:"pointer"}}>Edit</button>
+                    <button onClick={()=>{if(window.confirm("Remove?")){saveCt(contacts.filter(x=>x.id!==c.id));toast("Removed");}}} style={{background:"transparent",color:C.red,border:`1px solid ${C.red}33`,borderRadius:3,padding:"6px 12px",fontSize:12,fontFamily:FS,cursor:"pointer"}}>✕</button>
+                  </div>
+                </div>))}
+            </div>);
+          })}
+        </div>}
       </div>
-      <Toasts items={toasts} set={setToasts} />
+      {/* Toasts */}
+      <div style={{position:"fixed",top:16,right:16,zIndex:9999}}>{toasts.map(t=><div key={t.id} style={{background:C.pri,color:C.wh,padding:"10px 16px",borderRadius:3,fontSize:13,fontFamily:FS,fontWeight:500,marginBottom:8,boxShadow:"0 4px 16px rgba(0,0,0,0.12)"}}>{t.m}</div>)}</div>
     </div>
   );
 }
 
-export default function App() { return <EB><DealScreener /></EB>; }
+export default function App(){return<EB><DealScreener/></EB>;}
