@@ -95,7 +95,13 @@ function parseCSV(text) {
   }
   if (cur.trim()) lines.push(cur);
   if (lines.length < 2) return [];
-  const hdr = lines[0].split(",").map(h => h.trim());
+  // Parse headers with same quote-aware logic as data rows
+  const hdrRaw = [];
+  { let c = "", q = false;
+    for (let i = 0; i < lines[0].length; i++) { const ch = lines[0][i]; if (ch === '"') { q = !q; continue; } if (ch === "," && !q) { hdrRaw.push(c.trim()); c = ""; continue; } c += ch; }
+    hdrRaw.push(c.trim());
+  }
+  const hdr = hdrRaw;
   const fi = (n) => hdr.findIndex(h => h.toLowerCase() === n.toLowerCase());
   const ci = { mls: fi("MLS #"), type: fi("Type"), sub: fi("Sub Type"), status: fi("Status"), date: fi("Status Change Timestamp"), price: fi("Price"), dom: fi("DOM/CDOM"), addr: fi("Address"), city: fi("City"), zip: fi("Postal Code"), beds: fi("Bedrooms Total"), ba: fi("BA"), sqft: fi("Above Grade Finished Area"), acres: fi("Lot Size Acres"), yr: fi("Year Built"), garage: fi("Garage Spaces"), tax: fi("Annual Taxes") };
 
@@ -214,9 +220,15 @@ function DealScreener() {
   const [loading, setLoading] = useState(false);
   const [listingCount, setListingCount] = useState(0);
   const [filterContact, setFilterContact] = useState("all");
+  const [filterConf, setFilterConf] = useState("good"); // Default: hide "possible" matches
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [thresholds, setThresholds] = useState(() => JSON.parse(localStorage.getItem("ds_thresholds") || "null") || {
+    investorMaxPrice: 200000, fhaMinPrice: 60000, fhaMaxPrice: 250000, fhaMinBeds: 3,
+    moveupMinPrice: 175000, moveupMaxPrice: 400000, moveupMinBeds: 4, moveupMinSqft: 2000,
+    listingMinDOM: 60, minBaths: 0, minSqft: 0
+  });
   const [expandedGroups, setExpandedGroups] = useState({});
   const fileRef = useRef(null);
   const toast = useCallback((msg) => setToasts(p => [...p, { id: Date.now(), msg }]), []);
@@ -272,6 +284,7 @@ function DealScreener() {
   const TABS = [
     { id: "matches", label: "Matches", count: stats.total },
     { id: "contacts", label: "Contacts", count: contacts.length },
+    { id: "settings", label: "Settings", count: 0 },
   ];
 
   return (
@@ -364,16 +377,25 @@ function DealScreener() {
                   </div>
                 </div>
 
-                {/* Filter */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-                  <label style={{ fontSize: 13, fontFamily: SANS, fontWeight: 600, color: C.inkSoft }}>Show matches for:</label>
-                  <select value={filterContact} onChange={e => setFilterContact(e.target.value)} style={{ ...S.input, width: "auto", minWidth: 200, fontSize: 13, fontFamily: SANS }}>
-                    <option value="all">All contacts ({stats.total} matches)</option>
-                    {contactsWithMatches.map(c => {
-                      const count = results[c.id]?.matches.length || 0;
-                      return <option key={c.id} value={c.id}>{c.name} — {c.role} ({count})</option>;
-                    })}
-                  </select>
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <label style={{ fontSize: 13, fontFamily: SANS, fontWeight: 600, color: C.inkSoft }}>Contact:</label>
+                    <select value={filterContact} onChange={e => setFilterContact(e.target.value)} style={{ ...S.input, width: "auto", minWidth: 200, fontSize: 13, fontFamily: SANS }}>
+                      <option value="all">All contacts ({stats.total} matches)</option>
+                      {contactsWithMatches.map(c => {
+                        const count = results[c.id]?.matches.length || 0;
+                        return <option key={c.id} value={c.id}>{c.name} — {c.role} ({count})</option>;
+                      })}
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <label style={{ fontSize: 13, fontFamily: SANS, fontWeight: 600, color: C.inkSoft }}>Quality:</label>
+                    <select value={filterConf} onChange={e => setFilterConf(e.target.value)} style={{ ...S.input, width: "auto", fontSize: 13, fontFamily: SANS }}>
+                      <option value="strong">Strong only</option>
+                      <option value="good">Strong + Good</option>
+                      <option value="all">Show all (including Possible)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Match Groups */}
@@ -385,6 +407,13 @@ function DealScreener() {
                 ) : (
                   Object.values(results)
                     .filter(r => filterContact === "all" || r.contact.id === filterContact)
+                    .map(r => {
+                      const confOrder = { strong: 0, good: 1, possible: 2 };
+                      const minConf = filterConf === "strong" ? 0 : filterConf === "good" ? 1 : 2;
+                      const filtered = r.matches.filter(m => (confOrder[m.confidence] || 2) <= minConf);
+                      return { ...r, matches: filtered };
+                    })
+                    .filter(r => r.matches.length > 0)
                     .sort((a, b) => b.matches.filter(m => m.confidence === "strong").length - a.matches.filter(m => m.confidence === "strong").length || b.matches.length - a.matches.length)
                     .map(({ contact: ct, matches: mx }) => {
                       const open = expandedGroups[ct.id] !== false;
@@ -501,6 +530,43 @@ function DealScreener() {
               ))}
           </div>
         )}
+
+        {/* ═══ SETTINGS ═══ */}
+        {tab === "settings" && (
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 20 }}>Screening Settings</div>
+            {[
+              { label: "Investor Lane", fields: [{ key: "investorMaxPrice", name: "Max Price" }]},
+              { label: "First-Time Buyer Lane", fields: [{ key: "fhaMinPrice", name: "Min Price" },{ key: "fhaMaxPrice", name: "Max Price" },{ key: "fhaMinBeds", name: "Min Beds" }]},
+              { label: "Move-Up Buyer Lane", fields: [{ key: "moveupMinPrice", name: "Min Price" },{ key: "moveupMaxPrice", name: "Max Price" },{ key: "moveupMinBeds", name: "Min Beds" },{ key: "moveupMinSqft", name: "Min SqFt" }]},
+              { label: "Listing Lead Lane", fields: [{ key: "listingMinDOM", name: "Min Days on Market" }]},
+              { label: "Global Filters", fields: [{ key: "minBaths", name: "Min Baths" },{ key: "minSqft", name: "Min SqFt" }]},
+            ].map(section => (
+              <div key={section.label} style={{ ...S.card, marginBottom: 14 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.accent, marginBottom: 12 }}>{section.label}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                  {section.fields.map(f => (
+                    <div key={f.key}><label style={S.label}>{f.name}</label>
+                      <input style={S.input} type="number" value={thresholds[f.key] || 0} onChange={e => {
+                        const u = { ...thresholds, [f.key]: parseInt(e.target.value) || 0 };
+                        setThresholds(u); localStorage.setItem("ds_thresholds", JSON.stringify(u));
+                      }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div style={{ ...S.card }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.accent, marginBottom: 8 }}>About</div>
+              <div style={{ fontSize: 14, fontFamily: SANS, color: C.inkSoft, lineHeight: 1.7 }}>
+                Deal Screener V3 — The Real Estate Doc<br/>
+                Dr. Gina N. Eaton, Ph.D., REALTOR®<br/>
+                Howard Hanna Real Estate Services · Equal Housing Opportunity
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
       <Toasts items={toasts} set={setToasts} />
     </div>
