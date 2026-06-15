@@ -67,7 +67,7 @@ const DEF_CT=[
 // ── CSV Parser (48-column Deal Screener Export) ──────────────────────────────
 function parseCSV(text){
   const lines=[];let cur="",inQ=false;
-  for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){inQ=!inQ;continue;}if(ch==="\n"&&!inQ){lines.push(cur);cur="";continue;}if(ch==="\r"&&!inQ)continue;cur+=ch;}
+  for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){inQ=!inQ;cur+=ch;continue;}if(ch==="\n"&&!inQ){lines.push(cur);cur="";continue;}if(ch==="\r"&&!inQ)continue;cur+=ch;}
   if(cur.trim())lines.push(cur);
   if(lines.length<2)return[];
   // Quote-aware header parsing
