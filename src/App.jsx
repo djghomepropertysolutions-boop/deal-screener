@@ -212,7 +212,6 @@ function matchAll(listings,contacts,compData,sent){
       if((li.condition||"").toLowerCase().includes("fixer"))bonus.push({l:"Listed as Fixer",w:0.3});
 
       const bonusW=bonus.reduce((s,x)=>s+x.w,0);
-      const totalScore=bestScore+bonusW;
 
       // ── GRADE (based on financial viability + bonus signals) ──
       // Financial math must work — bonus signals alone can't make Grade A
