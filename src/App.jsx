@@ -17,17 +17,28 @@ const DFR=[650,800,1000,1180];
 function getFMR(z,b){const i=Math.min(Math.max(b,1),4)-1;return(FD[z]||DFR)[i];}
 
 // ── Rehab Estimates ──────────────────────────────────────────────────────────
-function estRehab(yr,sqft,condition){
-  if(!yr||!sqft)return 0;
-  const cond=(condition||"").toLowerCase();
-  if(cond.includes("new construction"))return Math.round(5*sqft);
-  if(cond.includes("updated")||cond.includes("remodeled"))return Math.round(10*sqft);
-  if(cond.includes("fixer"))return Math.round(40*sqft);
-  // fallback by year
-  if(yr<1950)return Math.round(42*sqft);
-  if(yr<1970)return Math.round(30*sqft);
-  if(yr<1990)return Math.round(20*sqft);
-  return Math.round(12*sqft);
+// Cleveland Rehab IQ — layered estimator: base $/sqft by condition tier,
+// then property-type x age multipliers, contingency, and a soft-cost bucket.
+// Pre-1950 is a RISK MULTIPLIER, not a base row. Returns {low, base, high}.
+// Construction cost only — excludes holding/finance costs.
+function estRehab(li){
+  const sqft=li.sqft;
+  if(!sqft||sqft<=0)return {low:0,base:0,high:0};
+  const cond=(li.condition||"").toLowerCase();
+  let lo,hi;
+  if(/new constr|to be built|to-be-built/.test(cond)){lo=0;hi=5;}                                          // turnkey
+  else if(/updated|remodel|renovat|move.?in|move in|turnkey|excellent/.test(cond)){lo=15;hi=25;}            // Cosmetic
+  else if(/full gut|\bgut\b|shell|tear.?down|teardown|uninhab|salvage/.test(cond)){lo=70;hi=115;}           // Full gut (explicit only)
+  else if(/fixer|below average|below avg|\bfair\b|dated|needs tlc|\btlc\b|handyman|needs work|distress|\bpoor\b/.test(cond)){lo=45;hi=70;} // Heavy (incl. Fixer)
+  else {lo=25;hi=45;}                                                                                       // Moderate (default: unknown/average/good)
+  const u=li.units||1; const isCondo=(li.subType==="CONDO");
+  const pAdj=isCondo?0.96:(u>=5?1.15:(u>=3?1.12:(u===2?1.08:1.00)));
+  const y=li.yr||0;
+  const aAdj=y>=1990?1.00:(y>=1970?1.04:(y>=1950?1.10:1.18));
+  const adj=pAdj*aAdj;
+  const cont=(y&&y<1950)?0.15:((y&&y<1970)?0.12:0.10);
+  const calc=ppsf=>{const base=ppsf*adj*sqft;const soft=Math.max(500,base*0.015);return Math.round(base*(1+cont)+soft);};
+  return {low:calc(lo),base:calc((lo+hi)/2),high:calc(hi)};
 }
 
 // ── Status & Strategy Constants ──────────────────────────────────────────────
@@ -122,6 +133,21 @@ function buildCompData(soldListings){
     d.medPrice=d.prices.sort((a,b)=>a-b)[Math.floor(d.prices.length/2)];
     d.avgPrice=Math.round(d.prices.reduce((a,b)=>a+b,0)/d.prices.length);
   });
+  // County-level rollup — fallback ARV source when a zip has no comps.
+  // Stored under a non-zip key so zip-count consumers can filter it out.
+  const byCounty={};
+  soldListings.forEach(s=>{
+    const cty=s.county; const soldP=s.closePrice||s.price; const sf=s.sqft;
+    if(!cty||!soldP||!sf||sf<=0)return;
+    if(!byCounty[cty])byCounty[cty]={ppsfs:[]};
+    byCounty[cty].ppsfs.push(Math.round(soldP/sf));
+  });
+  Object.keys(byCounty).forEach(c=>{
+    const a=byCounty[c].ppsfs;
+    byCounty[c].avgPpsf=Math.round(a.reduce((x,y)=>x+y,0)/a.length);
+    byCounty[c].count=a.length;
+  });
+  byZip.__county=byCounty;
   return byZip;
 }
 
@@ -146,38 +172,49 @@ function matchAll(listings,contacts,compData,sent){
       if(ct.hardRules?.some(r=>r.toLowerCase().includes("multifamily"))&&li.subType!=="MULTI")return;
 
       // ── Financial Analysis ──
-      const arv=li.avm||(compData[li.zip]?Math.round(compData[li.zip].avgPpsf*li.sqft):0);
+      // ARV source priority: Realist AVM -> zip comps -> county comps -> none (no fabrication)
+      const zipC=compData[li.zip];
+      const ctyC=compData.__county&&li.county?compData.__county[li.county]:null;
+      let arv=0, arvSrc="none";
+      if(li.avm>0){arv=li.avm;arvSrc="avm";}
+      else if(zipC&&zipC.avgPpsf&&li.sqft>0){arv=Math.round(zipC.avgPpsf*li.sqft);arvSrc="zip";}
+      else if(ctyC&&ctyC.avgPpsf&&li.sqft>0){arv=Math.round(ctyC.avgPpsf*li.sqft);arvSrc="county";}
       const rent=li.grossRent||getFMR(li.zip,li.beds);
-      const rehab=estRehab(li.yr,li.sqft,li.condition);
+      const reh=estRehab(li);
+      const rehab=reh.base;
       const allIn=li.price+rehab;
       const sigs=[];
-      const sc={arv,rent,rehab,allIn};
+      const sc={arv,arvSrc,rent,rehab,rehabLow:reh.low,rehabHigh:reh.high,allIn};
       let bestScore=0; // Track the best financial score across strategies
 
       // ── FLIP MATH ──
       if(strat.includes("flip")||strat==="any"){
-        const arvU=arv||Math.round(li.price*1.35);
-        const mao=Math.round(arvU*0.7-rehab);
-        const profit=arvU-allIn;
-        const margin=arvU>0?Math.round((profit/arvU)*100):0;
-        sc.fARV=arvU;sc.fMAO=mao;sc.fProfit=Math.round(profit);sc.fMargin=margin;
-        if(li.price<=mao&&profit>=20000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit ("+margin+"% margin)",w:4,t:"flip"});bestScore=Math.max(bestScore,4);}
-        else if(li.price<=mao*1.05&&profit>=10000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit (tight)",w:2.5,t:"flip"});bestScore=Math.max(bestScore,2.5);}
-        else if(profit>0&&profit<10000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit (thin margin)",w:1,t:"flip"});bestScore=Math.max(bestScore,1);}
-        else if(profit<=0){sc.fFlag="Negative flip profit";}
+        if(arv>0){
+          const arvU=arv;
+          const mao=Math.round(arvU*0.7-rehab);
+          const profit=arvU-allIn;
+          const margin=arvU>0?Math.round((profit/arvU)*100):0;
+          sc.fARV=arvU;sc.fMAO=mao;sc.fProfit=Math.round(profit);sc.fMargin=margin;
+          if(li.price<=mao&&profit>=20000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit ("+margin+"% margin)",w:4,t:"flip"});bestScore=Math.max(bestScore,4);}
+          else if(li.price<=mao*1.05&&profit>=10000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit (tight)",w:2.5,t:"flip"});bestScore=Math.max(bestScore,2.5);}
+          else if(profit>0&&profit<10000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit (thin margin)",w:1,t:"flip"});bestScore=Math.max(bestScore,1);}
+          else if(profit<=0){sc.fFlag="Negative flip profit";}
+        } else {sc.fFlag="ARV unknown — no comp data for this area";}
       }
 
       // ── BRRRR MATH ──
       if(strat.includes("brrrr")||strat==="any"){
-        const arvU=arv||Math.round(li.price*1.35);
-        const refiPct=ct.hardRules?.some(r=>r.includes("60%"))?0.6:0.75;
-        const refiAmt=Math.round(arvU*refiPct);
-        const cashLeft=allIn-refiAmt;
-        sc.bARV=arvU;sc.bRefi=refiAmt;sc.bCashLeft=Math.round(cashLeft);sc.bRefiPct=refiPct;
-        if(cashLeft<=0){sigs.push({l:"BRRRR: Pull ALL cash out + "+$f(Math.abs(Math.round(cashLeft))),w:4,t:"brrrr"});bestScore=Math.max(bestScore,4);}
-        else if(cashLeft<=10000){sigs.push({l:"BRRRR: Only "+$f(Math.round(cashLeft))+" left in",w:2.5,t:"brrrr"});bestScore=Math.max(bestScore,2.5);}
-        else if(cashLeft<=25000){sigs.push({l:"BRRRR: "+$f(Math.round(cashLeft))+" left in (moderate)",w:1,t:"brrrr"});bestScore=Math.max(bestScore,1);}
-        else{sc.bFlag="Too much cash left in: "+$f(Math.round(cashLeft));}
+        if(arv>0){
+          const arvU=arv;
+          const refiPct=ct.hardRules?.some(r=>r.includes("60%"))?0.6:0.75;
+          const refiAmt=Math.round(arvU*refiPct);
+          const cashLeft=allIn-refiAmt;
+          sc.bARV=arvU;sc.bRefi=refiAmt;sc.bCashLeft=Math.round(cashLeft);sc.bRefiPct=refiPct;
+          if(cashLeft<=0){sigs.push({l:"BRRRR: Pull ALL cash out + "+$f(Math.abs(Math.round(cashLeft))),w:4,t:"brrrr"});bestScore=Math.max(bestScore,4);}
+          else if(cashLeft<=10000){sigs.push({l:"BRRRR: Only "+$f(Math.round(cashLeft))+" left in",w:2.5,t:"brrrr"});bestScore=Math.max(bestScore,2.5);}
+          else if(cashLeft<=25000){sigs.push({l:"BRRRR: "+$f(Math.round(cashLeft))+" left in (moderate)",w:1,t:"brrrr"});bestScore=Math.max(bestScore,1);}
+          else{sc.bFlag="Too much cash left in: "+$f(Math.round(cashLeft));}
+        } else {sc.bFlag="ARV unknown — no comp data for this area";}
       }
 
       // ── HOLD / CASH FLOW MATH ──
@@ -214,11 +251,18 @@ function matchAll(listings,contacts,compData,sent){
       const bonusW=bonus.reduce((s,x)=>s+x.w,0);
 
       // ── GRADE (based on financial viability + bonus signals) ──
-      // Financial math must work — bonus signals alone can't make Grade A
+      // Financial math must work — bonus signals alone can't make Grade A.
+      // Calibrated V6c: C floor raised 0.5 -> 1.0 so break-even-only deals drop to D
+      // (was flagging ~2,600 marginal holds as C). Bonus can only promote a deal
+      // that is already near the next tier, not a weak one.
+      //   A = strong deal (Send Now)      bestScore >= 3.5  (or >=3 with real motivation)
+      //   B = solid (Worth a Look)        bestScore >= 2    (or >=1.5 with strong motivation)
+      //   C = marginal but real           bestScore >= 1
+      //   D = break-even / negative       bestScore <  1
       let grade="D";
-      if(bestScore>=3.5||(bestScore>=2.5&&bonusW>=1))grade="A";
-      else if(bestScore>=2||(bestScore>=1&&bonusW>=1.5))grade="B";
-      else if(bestScore>=0.5)grade="C";
+      if(bestScore>=3.5||(bestScore>=3&&bonusW>=1))grade="A";
+      else if(bestScore>=2||(bestScore>=1.5&&bonusW>=1.5))grade="B";
+      else if(bestScore>=1)grade="C";
 
       // No financial signals at all = skip
       if(sigs.length===0&&bonus.length===0)return;
@@ -378,8 +422,8 @@ function DealScreener(){
 
           {actives.length>0&&<>
             {/* Comp data notice */}
-            {Object.keys(compData).length>0?
-              <div style={{fontSize:12,fontFamily:FS,color:C.grn,marginBottom:12}}>Sold comp data loaded: {Object.keys(compData).length} zip codes mapped · Realist AVM available on 95% of listings</div>:
+            {Object.keys(compData).filter(k=>!k.startsWith("__")).length>0?
+              <div style={{fontSize:12,fontFamily:FS,color:C.grn,marginBottom:12}}>Sold comp data loaded: {Object.keys(compData).filter(k=>!k.startsWith("__")).length} zip codes mapped · Realist AVM available on 95% of listings</div>:
               <div style={{fontSize:12,fontFamily:FS,color:C.amb,marginBottom:12,fontWeight:600}}>Upload Sold Comps for ARV comparison data. Using Realist AVM as primary valuation.</div>}
 
             {/* Stats */}
@@ -459,7 +503,7 @@ function DealScreener(){
                       </div>
                       {/* Valuation */}
                       {m.arv>0&&<div style={{fontSize:12,fontFamily:FS,color:C.blu,marginTop:6}}>
-                        Est. Value: {$f(m.arv)}{m.avm>0?" (AVM)":compData[m.zip]?" (comps)":""} · Rehab est: {$f(m.sc.rehab)} · All-in: {$f(m.sc.allIn)}
+                        Est. Value: {$f(m.arv)}{m.sc.arvSrc==="avm"?" (AVM)":m.sc.arvSrc==="zip"?" (zip comps)":m.sc.arvSrc==="county"?" (county comps)":""} · Rehab: {$f(m.sc.rehabLow)}–{$f(m.sc.rehabHigh)} (est {$f(m.sc.rehab)}) · All-in: {$f(m.sc.allIn)}
                       </div>}
                       {/* Financial Scorecards */}
                       <div style={{marginTop:6,padding:"8px 10px",background:C.off,borderRadius:3,fontSize:12,fontFamily:FS}}>
