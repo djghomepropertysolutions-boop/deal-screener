@@ -131,66 +131,105 @@ function matchAll(listings,contacts,compData,sent){
   contacts.forEach(ct=>{
     if(ct.status==="Cold"||ct.status==="Closed"||ct.role==="Wholesaler")return;
     const mx=[];
+    const strat=(ct.strategy||"Any").toLowerCase();
+    const hasGeo=ct.geoReq&&ct.geoReq.length>0;
     listings.forEach(li=>{
-      if(li.isSold)return; // Don't match sold listings
-      // Buy box pass/fail
+      if(li.isSold)return;
+      // ── Buy Box Pass/Fail ──
       if(li.price>(ct.priceMax||9999999))return;
       if((ct.bedsMin||0)>0&&li.beds<ct.bedsMin)return;
       if((ct.bathsMin||0)>0&&li.baths<ct.bathsMin)return;
-      if(ct.geoReq?.length>0&&!ct.geoReq.some(g=>li.city.toLowerCase()===g.toLowerCase()))return;
+      if(hasGeo&&!ct.geoReq.some(g=>li.city.toLowerCase()===g.toLowerCase()))return;
       if(ct.geoEx?.length>0&&ct.geoEx.some(g=>li.city.toLowerCase()===g.toLowerCase()))return;
       if(ct.subTypes?.length>0&&!ct.subTypes.includes("Any")&&!ct.subTypes.includes(li.subType))return;
-      // Isaiah foundation check
       if(ct.hardRules?.some(r=>r.toLowerCase().includes("foundation"))&&li.foundation&&li.foundation.toLowerCase().includes("damage"))return;
+      if(ct.hardRules?.some(r=>r.toLowerCase().includes("multifamily"))&&li.subType!=="MULTI")return;
 
-      const sigs=[];
-      // ARV comparison (Realist AVM primary, comp data secondary)
-      const arv=li.avm||(compData[li.zip]?compData[li.zip].avgPpsf*li.sqft:0);
-      if(arv>0&&li.price>0){
-        const arvRatio=li.price/arv;
-        if(arvRatio<=0.6)sigs.push({l:"Price is "+Math.round((1-arvRatio)*100)+"% below estimated value ("+$f(arv)+")",w:3});
-        else if(arvRatio<=0.75)sigs.push({l:"Price is "+Math.round((1-arvRatio)*100)+"% below est. value ("+$f(arv)+")",w:2});
-        else if(arvRatio<=0.85)sigs.push({l:"Priced "+Math.round((1-arvRatio)*100)+"% below est. value",w:1});
-      }
-      // Geo match
-      if(ct.geoReq?.length>0)sigs.push({l:"In target area ("+li.city+")",w:1.5});
-      // Rent ratio
+      // ── Financial Analysis ──
+      const arv=li.avm||(compData[li.zip]?Math.round(compData[li.zip].avgPpsf*li.sqft):0);
       const rent=li.grossRent||getFMR(li.zip,li.beds);
-      if(rent>0&&li.price>0){
-        const rr=(rent/li.price)*100;
-        if(rr>=1.2)sigs.push({l:rr.toFixed(1)+"% rent ratio — strong cash flow",w:2});
-        else if(rr>=1.0)sigs.push({l:rr.toFixed(1)+"% rent ratio (1% rule)",w:1.5});
-        else if(rr>=0.8)sigs.push({l:rr.toFixed(1)+"% rent ratio",w:0.5});
+      const rehab=estRehab(li.yr,li.sqft,li.condition);
+      const allIn=li.price+rehab;
+      const sigs=[];
+      const sc={arv,rent,rehab,allIn};
+      let bestScore=0; // Track the best financial score across strategies
+
+      // ── FLIP MATH ──
+      if(strat.includes("flip")||strat==="any"){
+        const arvU=arv||Math.round(li.price*1.35);
+        const mao=Math.round(arvU*0.7-rehab);
+        const profit=arvU-allIn;
+        const margin=arvU>0?Math.round((profit/arvU)*100):0;
+        sc.fARV=arvU;sc.fMAO=mao;sc.fProfit=Math.round(profit);sc.fMargin=margin;
+        if(li.price<=mao&&profit>=20000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit ("+margin+"% margin)",w:4,t:"flip"});bestScore=Math.max(bestScore,4);}
+        else if(li.price<=mao*1.05&&profit>=10000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit (tight)",w:2.5,t:"flip"});bestScore=Math.max(bestScore,2.5);}
+        else if(profit>0&&profit<10000){sigs.push({l:"Flip: "+$f(Math.round(profit))+" profit (thin margin)",w:1,t:"flip"});bestScore=Math.max(bestScore,1);}
+        else if(profit<=0){sc.fFlag="Negative flip profit";}
       }
-      // DOM
-      if(li.dom>=90)sigs.push({l:li.dom+" days — highly motivated",w:1.5});
-      else if(li.dom>=60)sigs.push({l:li.dom+" days — motivated",w:1});
-      // Price reduction
-      if(li.reduced&&li.dropPct>=10)sigs.push({l:"Price reduced "+li.dropPct+"% from "+$f(li.origPrice),w:1.5});
-      else if(li.reduced)sigs.push({l:"Price reduced "+li.dropPct+"%",w:0.5});
-      // Condition
-      if((li.condition||"").toLowerCase().includes("fixer"))sigs.push({l:"Listed as Fixer",w:1});
-      // Foreclosure / Court Ordered
-      if(li.foreclosure==="Yes")sigs.push({l:"Realist Foreclosure flag",w:1.5});
-      if(li.courtOrdered==="Yes")sigs.push({l:"Court ordered sale",w:1});
-      // Vacant
-      if(li.occupant==="Vacant")sigs.push({l:"Vacant — immediate access",w:0.5});
-      // Tenant in place
-      if(li.occupant==="Tenant")sigs.push({l:"Tenant in place — income from day 1",w:0.5});
-      // Multifamily bonus for multifamily investors
-      if(ct.strategy==="Multifamily"&&li.subType==="MULTI")sigs.push({l:"Multi-family property",w:1.5});
 
-      // Grade
-      const tw=sigs.reduce((s,x)=>s+x.w,0);
+      // ── BRRRR MATH ──
+      if(strat.includes("brrrr")||strat==="any"){
+        const arvU=arv||Math.round(li.price*1.35);
+        const refiPct=ct.hardRules?.some(r=>r.includes("60%"))?0.6:0.75;
+        const refiAmt=Math.round(arvU*refiPct);
+        const cashLeft=allIn-refiAmt;
+        sc.bARV=arvU;sc.bRefi=refiAmt;sc.bCashLeft=Math.round(cashLeft);sc.bRefiPct=refiPct;
+        if(cashLeft<=0){sigs.push({l:"BRRRR: Pull ALL cash out + "+$f(Math.abs(Math.round(cashLeft))),w:4,t:"brrrr"});bestScore=Math.max(bestScore,4);}
+        else if(cashLeft<=10000){sigs.push({l:"BRRRR: Only "+$f(Math.round(cashLeft))+" left in",w:2.5,t:"brrrr"});bestScore=Math.max(bestScore,2.5);}
+        else if(cashLeft<=25000){sigs.push({l:"BRRRR: "+$f(Math.round(cashLeft))+" left in (moderate)",w:1,t:"brrrr"});bestScore=Math.max(bestScore,1);}
+        else{sc.bFlag="Too much cash left in: "+$f(Math.round(cashLeft));}
+      }
+
+      // ── HOLD / CASH FLOW MATH ──
+      if(strat.includes("hold")||strat.includes("section")||strat.includes("house hack")||strat.includes("rental")||strat.includes("multi")||strat==="any"){
+        if(rent>0&&li.price>0){
+          const loanAmt=li.price*0.8;
+          const monthlyPI=loanAmt>0?(loanAmt*(0.07/12)*Math.pow(1+0.07/12,360))/(Math.pow(1+0.07/12,360)-1):0;
+          const monthlyTax=li.tax>0?li.tax/12:li.price*0.025/12;
+          const ins=li.insurance>0?li.insurance/12:80;
+          const vac=rent*0.08;const maint=rent*0.10;
+          const totalExp=monthlyPI+monthlyTax+ins+vac+maint;
+          const cf=rent-totalExp;
+          const capRate=li.price>0?((rent*12-li.tax-(ins*12)-(vac*12)-(maint*12))/li.price)*100:0;
+          sc.hRent=rent;sc.hPI=Math.round(monthlyPI);sc.hTax=Math.round(monthlyTax);sc.hExp=Math.round(totalExp);sc.hCF=Math.round(cf);sc.hCap=capRate.toFixed(1);
+          if(cf>=300){sigs.push({l:"Cash flow: "+$f(Math.round(cf))+"/mo ("+capRate.toFixed(1)+"% cap)",w:3.5,t:"hold"});bestScore=Math.max(bestScore,3.5);}
+          else if(cf>=150){sigs.push({l:"Cash flow: "+$f(Math.round(cf))+"/mo",w:2,t:"hold"});bestScore=Math.max(bestScore,2);}
+          else if(cf>=0){sigs.push({l:"Break-even cash flow",w:0.5,t:"hold"});bestScore=Math.max(bestScore,0.5);}
+          else{sc.hFlag="Negative cash flow: "+$f(Math.round(cf))+"/mo";}
+        }
+      }
+
+      // ── BONUS SIGNALS (add to grade but don't determine it alone) ──
+      const bonus=[];
+      if(hasGeo)bonus.push({l:"In target area ("+li.city+")",w:0.5});
+      if(li.dom>=90)bonus.push({l:li.dom+" days — highly motivated",w:1});
+      else if(li.dom>=60)bonus.push({l:li.dom+" days — motivated",w:0.5});
+      if(li.reduced&&li.dropPct>=10)bonus.push({l:"Price reduced "+li.dropPct+"%",w:0.5});
+      if(li.foreclosure==="Yes")bonus.push({l:"Foreclosure",w:0.5});
+      if(li.courtOrdered==="Yes")bonus.push({l:"Court ordered",w:0.5});
+      if(li.occupant==="Vacant")bonus.push({l:"Vacant",w:0.3});
+      if(li.occupant==="Tenant")bonus.push({l:"Tenant in place",w:0.3});
+      if((li.condition||"").toLowerCase().includes("fixer"))bonus.push({l:"Listed as Fixer",w:0.3});
+
+      const bonusW=bonus.reduce((s,x)=>s+x.w,0);
+      const totalScore=bestScore+bonusW;
+
+      // ── GRADE (based on financial viability + bonus signals) ──
+      // Financial math must work — bonus signals alone can't make Grade A
       let grade="D";
-      if(tw>=5)grade="A";
-      else if(tw>=2.5)grade="B";
-      else if(tw>=0.5)grade="C";
-      if(sigs.length===0)return;
+      if(bestScore>=3.5||(bestScore>=2.5&&bonusW>=1))grade="A";
+      else if(bestScore>=2||(bestScore>=1&&bonusW>=1.5))grade="B";
+      else if(bestScore>=0.5)grade="C";
 
+      // No financial signals at all = skip
+      if(sigs.length===0&&bonus.length===0)return;
+      // Only bonus signals, no financial case = Grade D at best
+      if(sigs.length===0)grade="D";
+
+      const allSigs=[...sigs,...bonus];
       const sentKey=li.key;
       const sTo=sent[sentKey]||[];
-      mx.push({...li,sigs,grade,arv:arv||0,rent,alreadySent:sTo.length>0,sentTo:sTo});
+      mx.push({...li,sigs:allSigs,grade,sc,arv:arv||0,rent,alreadySent:sTo.length>0,sentTo:sTo});
     });
     mx.sort((a,b)=>({A:0,B:1,C:2,D:3}[a.grade]||9)-({A:0,B:1,C:2,D:3}[b.grade]||9));
     if(mx.length>0)out[ct.id]={contact:ct,matches:mx};
@@ -421,8 +460,20 @@ function DealScreener(){
                       </div>
                       {/* Valuation */}
                       {m.arv>0&&<div style={{fontSize:12,fontFamily:FS,color:C.blu,marginTop:6}}>
-                        Est. Value: {$f(m.arv)}{m.avm>0?" (Realist AVM)":compData[m.zip]?" (area comp avg)":""} · {m.arv>m.price?"Priced "+Math.round((1-m.price/m.arv)*100)+"% below":"At or above est. value"}
+                        Est. Value: {$f(m.arv)}{m.avm>0?" (AVM)":compData[m.zip]?" (comps)":""} · Rehab est: {$f(m.sc.rehab)} · All-in: {$f(m.sc.allIn)}
                       </div>}
+                      {/* Financial Scorecards */}
+                      <div style={{marginTop:6,padding:"8px 10px",background:C.off,borderRadius:3,fontSize:12,fontFamily:FS}}>
+                        {m.sc.fProfit!==undefined&&<div style={{color:m.sc.fProfit>10000?C.grn:m.sc.fProfit>0?C.amb:C.red,marginBottom:2}}>
+                          Flip: {$f(m.sc.fProfit)} profit · {m.sc.fMargin}% margin · MAO: {$f(m.sc.fMAO)}{m.sc.fFlag?" · ⚠ "+m.sc.fFlag:""}
+                        </div>}
+                        {m.sc.bCashLeft!==undefined&&<div style={{color:m.sc.bCashLeft<=0?C.grn:m.sc.bCashLeft<=15000?C.amb:C.red,marginBottom:2}}>
+                          BRRRR ({Math.round(m.sc.bRefiPct*100)}%): {m.sc.bCashLeft<=0?"Cash out + "+$f(Math.abs(m.sc.bCashLeft)):$f(m.sc.bCashLeft)+" left in"} · Refi: {$f(m.sc.bRefi)}{m.sc.bFlag?" · ⚠ "+m.sc.bFlag:""}
+                        </div>}
+                        {m.sc.hCF!==undefined&&<div style={{color:m.sc.hCF>=200?C.grn:m.sc.hCF>=0?C.amb:C.red}}>
+                          Hold: {$f(m.sc.hCF)}/mo cash flow · {m.sc.hCap}% cap · Rent: {$f(m.sc.hRent)} · PITI: {$f(m.sc.hPI+m.sc.hTax)}{m.sc.hFlag?" · ⚠ "+m.sc.hFlag:""}
+                        </div>}
+                      </div>
                       {/* Rent estimate */}
                       <div style={{fontSize:12,fontFamily:FS,color:C.inkS,marginTop:2}}>
                         Est. rent: {$f(m.rent)}/mo ({m.grossRent>0?"MLS actual":"FMR estimate"})
