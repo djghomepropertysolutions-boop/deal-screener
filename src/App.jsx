@@ -133,21 +133,6 @@ function buildCompData(soldListings){
     d.medPrice=d.prices.sort((a,b)=>a-b)[Math.floor(d.prices.length/2)];
     d.avgPrice=Math.round(d.prices.reduce((a,b)=>a+b,0)/d.prices.length);
   });
-  // County-level rollup — fallback ARV source when a zip has no comps.
-  // Stored under a non-zip key so zip-count consumers can filter it out.
-  const byCounty={};
-  soldListings.forEach(s=>{
-    const cty=s.county; const soldP=s.closePrice||s.price; const sf=s.sqft;
-    if(!cty||!soldP||!sf||sf<=0)return;
-    if(!byCounty[cty])byCounty[cty]={ppsfs:[]};
-    byCounty[cty].ppsfs.push(Math.round(soldP/sf));
-  });
-  Object.keys(byCounty).forEach(c=>{
-    const a=byCounty[c].ppsfs;
-    byCounty[c].avgPpsf=Math.round(a.reduce((x,y)=>x+y,0)/a.length);
-    byCounty[c].count=a.length;
-  });
-  byZip.__county=byCounty;
   return byZip;
 }
 
@@ -172,13 +157,11 @@ function matchAll(listings,contacts,compData,sent){
       if(ct.hardRules?.some(r=>r.toLowerCase().includes("multifamily"))&&li.subType!=="MULTI")return;
 
       // ── Financial Analysis ──
-      // ARV source priority: Realist AVM -> zip comps -> county comps -> none (no fabrication)
+      // ARV source priority: Realist AVM -> zip comps -> none (no fabrication; county retired V6f)
       const zipC=compData[li.zip];
-      const ctyC=compData.__county&&li.county?compData.__county[li.county]:null;
       let arv=0, arvSrc="none";
       if(li.avm>0){arv=li.avm;arvSrc="avm";}
       else if(zipC&&zipC.avgPpsf&&li.sqft>0){arv=Math.round(zipC.avgPpsf*li.sqft);arvSrc="zip";}
-      else if(ctyC&&ctyC.avgPpsf&&li.sqft>0){arv=Math.round(ctyC.avgPpsf*li.sqft);arvSrc="county";}
       const rent=li.grossRent||getFMR(li.zip,li.beds);
       const reh=estRehab(li);
       const rehab=reh.base;
@@ -187,9 +170,19 @@ function matchAll(listings,contacts,compData,sent){
       const sc={arv,arvSrc,rent,rehab,rehabLow:reh.low,rehabHigh:reh.high,allIn};
       let bestScore=0; // Track the best financial score across strategies
 
+      // ── Manual-review triggers (V6f) ──
+      // Auction/REO list prices are unreliable, and comp-derived ARVs far above list
+      // are almost always bad comps. Flag these for manual review instead of auto-grading.
+      const _txt=((li.remarks||"")+" "+(li.listTerms||"")).toLowerCase();
+      const isAuction=/\bauction\b|sheriff'?s?\s*sale|trustee'?s?\s*sale|auction\.com|absolute auction|highest bidder|online bidding|\breo\b|bank[\s-]?owned/.test(_txt);
+      const arvOutlier=arvSrc!=="avm"&&arv>0&&li.price>0&&arv>li.price*2.5;
+      let reviewReason="";
+      if(isAuction)reviewReason="Auction / REO — list price unreliable; verify before sending";
+      else if(arvOutlier)reviewReason="ARV outlier ("+(arv/li.price).toFixed(1)+"× list) — verify comps";
+
       // ── FLIP MATH ──
       if(strat.includes("flip")||strat==="any"){
-        if(arv>0){
+        if(arv>0&&!reviewReason){
           const arvU=arv;
           const mao=Math.round(arvU*0.7-rehab);
           const profit=arvU-allIn;
@@ -204,7 +197,7 @@ function matchAll(listings,contacts,compData,sent){
 
       // ── BRRRR MATH ──
       if(strat.includes("brrrr")||strat==="any"){
-        if(arv>0){
+        if(arv>0&&!reviewReason){
           const arvU=arv;
           const refiPct=ct.hardRules?.some(r=>r.includes("60%"))?0.6:0.75;
           const refiAmt=Math.round(arvU*refiPct);
@@ -219,7 +212,7 @@ function matchAll(listings,contacts,compData,sent){
 
       // ── HOLD / CASH FLOW MATH ──
       if(strat.includes("hold")||strat.includes("section")||strat.includes("house hack")||strat.includes("rental")||strat.includes("multi")||strat==="any"){
-        if(rent>0&&li.price>0){
+        if(rent>0&&li.price>0&&!isAuction){
           const loanAmt=li.price*0.8;
           const monthlyPI=loanAmt>0?(loanAmt*(0.07/12)*Math.pow(1+0.07/12,360))/(Math.pow(1+0.07/12,360)-1):0;
           const monthlyTax=li.tax>0?li.tax/12:li.price*0.025/12;
@@ -266,6 +259,15 @@ function matchAll(listings,contacts,compData,sent){
 
       // No financial signals at all = skip
       if(sigs.length===0&&bonus.length===0)return;
+
+      // Manual review takes precedence — never auto-grade an auction/outlier
+      if(reviewReason){
+        sc.review=reviewReason;
+        const sentKeyR=li.key;const sToR=sent[sentKeyR]||[];
+        mx.push({...li,sigs:[],grade:"REVIEW",sc,arv:arv||0,rent,alreadySent:sToR.length>0,sentTo:sToR});
+        return;
+      }
+
       // Only bonus signals, no financial case = Grade D at best
       if(sigs.length===0)grade="D";
 
@@ -386,9 +388,9 @@ function DealScreener(){
     toast(sold.length+" sold comps — "+Object.keys(cd).length+" zips mapped");
   };
 
-  const stats=useMemo(()=>{let t=0,a=0,b=0,ct=0;Object.values(results).forEach(r=>{ct++;r.matches.forEach(m=>{t++;if(m.grade==="A")a++;if(m.grade==="B")b++;});});return{t,a,b,c:t-a-b,ct};},[results]);
+  const stats=useMemo(()=>{let t=0,a=0,b=0,rev=0,ct=0;Object.values(results).forEach(r=>{ct++;r.matches.forEach(m=>{t++;if(m.grade==="A")a++;else if(m.grade==="B")b++;else if(m.grade==="REVIEW")rev++;});});return{t,a,b,c:t-a-b-rev,rev,ct};},[results]);
 
-  const GRADES={A:{c:C.grn,bg:C.grnS,l:"Send Now"},B:{c:C.amb,bg:C.ambS,l:"Worth a Look"},C:{c:C.inkS,bg:C.bdrL,l:"Watchlist"},D:{c:C.inkM,bg:C.off,l:"Skip"}};
+  const GRADES={A:{c:C.grn,bg:C.grnS,l:"Send Now"},B:{c:C.amb,bg:C.ambS,l:"Worth a Look"},C:{c:C.inkS,bg:C.bdrL,l:"Watchlist"},D:{c:C.inkM,bg:C.off,l:"Skip"},REVIEW:{c:C.amb,bg:C.ambS,l:"Manual Review"}};
   const pill=(bg,fg,t)=><span style={{display:"inline-block",background:bg,color:fg,borderRadius:2,padding:"2px 8px",fontSize:11,fontWeight:600,fontFamily:FS}}>{t}</span>;
   const dot=c=><span style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:c}}/>;
   const divEl=<span style={{display:"inline-block",width:1,height:12,background:C.bdr,margin:"0 8px",verticalAlign:"middle"}}/>;
@@ -457,7 +459,7 @@ function DealScreener(){
 
             {/* Match Groups */}
             {Object.values(results).filter(r=>filterCt==="all"||r.contact.id===filterCt).map(r=>{
-              const go={A:0,B:1,C:2,D:3};const maxG=filterG==="all"?3:go[filterG]??1;
+              const go={A:0,B:1,C:2,D:3,REVIEW:4};const maxG=filterG==="all"?9:go[filterG]??1;
               const filtered=r.matches.filter(m=>(go[m.grade]??9)<=maxG);
               if(!filtered.length)return null;
               const ct=r.contact;const isOpen=expanded[ct.id]!==false;
@@ -483,8 +485,9 @@ function DealScreener(){
                     return(<div key={m.key+i} style={{background:C.wh,border:`1px solid ${C.bdr}`,borderLeft:`3px solid ${G.c}`,borderRadius:4,padding:"14px 16px",marginBottom:8}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div><div style={{fontWeight:700,fontSize:15}}>{m.addr}</div><div style={{fontSize:12,fontFamily:FS,color:C.inkS}}>{m.city}, OH {m.zip} · {m.county} County</div></div>
-                        <div style={{textAlign:"right"}}><div style={{fontFamily:FM,fontWeight:700,fontSize:18,color:C.pri}}>{$f(m.price)}</div>{pill(G.bg,G.c,"Grade "+m.grade+" — "+G.l)}</div>
+                        <div style={{textAlign:"right"}}><div style={{fontFamily:FM,fontWeight:700,fontSize:18,color:C.pri}}>{$f(m.price)}</div>{pill(G.bg,G.c,m.grade==="REVIEW"?"⚠ Manual Review":"Grade "+m.grade+" — "+G.l)}</div>
                       </div>
+                      {m.sc.review&&<div style={{fontSize:12,fontFamily:FS,color:C.amb,fontWeight:600,padding:"6px 10px",background:C.ambS,borderRadius:3,marginTop:8}}>⚠ {m.sc.review}</div>}
                       {/* Property Details */}
                       <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",marginTop:8,fontSize:13,fontFamily:FS,color:C.inkS}}>
                         <span>{m.beds}bd/{m.baths}ba</span>{divEl}
