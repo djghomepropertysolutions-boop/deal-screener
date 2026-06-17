@@ -22,8 +22,13 @@ function getFMR(z,b){const i=Math.min(Math.max(b,1),4)-1;return(FD[z]||DFR)[i];}
 // Pre-1950 is a RISK MULTIPLIER, not a base row. Returns {low, base, high}.
 // Construction cost only — excludes holding/finance costs.
 function estRehab(li){
-  const sqft=li.sqft;
-  if(!sqft||sqft<=0)return {low:0,base:0,high:0};
+  let sqft=li.sqft, sqftEst=false;
+  if(!sqft||sqft<=0){
+    // No square footage in the feed — estimate from bed count so rehab is never $0 on a real house.
+    const b=li.beds||0;
+    sqft=b<=1?800:b===2?1000:b===3?1300:b===4?1700:b>=5?2200:1200;
+    sqftEst=true;
+  }
   const cond=(li.condition||"").toLowerCase();
   let lo,hi;
   if(/new constr|to be built|to-be-built/.test(cond)){lo=0;hi=5;}                                          // turnkey
@@ -38,7 +43,7 @@ function estRehab(li){
   const adj=pAdj*aAdj;
   const cont=(y&&y<1950)?0.15:((y&&y<1970)?0.12:0.10);
   const calc=ppsf=>{const base=ppsf*adj*sqft;const soft=Math.max(500,base*0.015);return Math.round(base*(1+cont)+soft);};
-  return {low:calc(lo),base:calc((lo+hi)/2),high:calc(hi)};
+  return {low:calc(lo),base:calc((lo+hi)/2),high:calc(hi),est:sqftEst};
 }
 
 // ── Status & Strategy Constants ──────────────────────────────────────────────
@@ -144,6 +149,10 @@ function matchAll(listings,contacts,compData,sent){
     const mx=[];
     const strat=(ct.strategy||"Any").toLowerCase();
     const hasGeo=ct.geoReq&&ct.geoReq.length>0;
+    // Generic all-in cap: a hard rule like "All-in <= $150K". Ignores ratio rules (e.g. "All-in <=60% ARV").
+    let allInCap=0;
+    const _air=(ct.hardRules||[]).find(r=>/all.?in/i.test(r)&&/\$|\dk|\d{4,}/i.test(r)&&!/%|arv/i.test(r));
+    if(_air){const m=_air.replace(/,/g,"").match(/\$?\s*(\d+(?:\.\d+)?)\s*([km])?/i);if(m){let n=parseFloat(m[1]);const u=(m[2]||"").toLowerCase();if(u==="k")n*=1e3;else if(u==="m")n*=1e6;else if(n<1000)n*=1e3;allInCap=Math.round(n);}}
     listings.forEach(li=>{
       if(li.isSold)return;
       // ── Buy Box Pass/Fail ──
@@ -157,28 +166,60 @@ function matchAll(listings,contacts,compData,sent){
       if(ct.hardRules?.some(r=>r.toLowerCase().includes("multifamily"))&&li.subType!=="MULTI")return;
 
       // ── Financial Analysis ──
-      // ARV source priority: Realist AVM -> zip comps -> none (no fabrication; county retired V6f)
+      const isMF = li.subType==="MULTI" || (li.units||0)>=2;
+
+      // Rent (MONTHLY). MF: actual Gross Rent Total (all units) or FMR x units. SFH: grossRent or FMR by beds.
+      let rent, rentActual=false;
+      if(isMF){
+        if(li.grossRent>0){rent=li.grossRent;rentActual=true;}
+        else{const u=li.units||2;const bpu=Math.max(1,Math.round((li.beds||0)/u));rent=getFMR(li.zip,bpu)*u;}
+      } else {
+        rent=li.grossRent||getFMR(li.zip,li.beds);
+        rentActual=li.grossRent>0;
+      }
+
+      // MF income-class (B/C, cutoff 1975) — drives GRM/cap bands
+      const _cond=(li.condition||"").toLowerCase();
+      const _updated=/updated|remodel|renovat|move.?in|turnkey|excellent/.test(_cond);
+      const _lowCond=/fixer|below average|\bfair\b|dated|needs|handyman|distress|\bpoor\b|\bgut\b|shell/.test(_cond);
+      const _yr=li.yr||0;
+      const mfClass=(_yr>=1975||_updated)?"B":"C";
+      const mfClassConflict = isMF && _yr>=1975 && _lowCond; // newer building, poor condition -> verify
+
+      // ARV / value. MF: income approach (lower of GRM and cap). SFH: AVM -> zip comps -> none.
       const zipC=compData[li.zip];
       let arv=0, arvSrc="none";
-      if(li.avm>0){arv=li.avm;arvSrc="avm";}
-      else if(zipC&&zipC.avgPpsf&&li.sqft>0){arv=Math.round(zipC.avgPpsf*li.sqft);arvSrc="zip";}
-      const rent=li.grossRent||getFMR(li.zip,li.beds);
+      if(isMF){
+        const annual=rent*12;
+        const grm=mfClass==="B"?11:9;
+        const expR=mfClass==="B"?0.45:0.50;
+        const capR=mfClass==="B"?0.085:0.10;
+        const grmVal=annual*grm;
+        const capVal=(annual*(1-expR))/capR;
+        arv=Math.round(Math.min(grmVal,capVal));
+        arvSrc=rentActual?"income":"income-est";
+      } else {
+        if(li.avm>0){arv=li.avm;arvSrc="avm";}
+        else if(zipC&&zipC.avgPpsf&&li.sqft>0){arv=Math.round(zipC.avgPpsf*li.sqft);arvSrc="zip";}
+      }
       const reh=estRehab(li);
       const rehab=reh.base;
       const allIn=li.price+rehab;
+      // All-in cap (e.g. Cheryl "All-in <= $150K"): test purchase + rehab, not list price alone.
+      if(allInCap>0&&allIn>allInCap)return;
       const sigs=[];
-      const sc={arv,arvSrc,rent,rehab,rehabLow:reh.low,rehabHigh:reh.high,allIn};
+      const sc={arv,arvSrc,rent,rentActual,mfClass:isMF?mfClass:undefined,rehab,rehabLow:reh.low,rehabHigh:reh.high,rehabEst:reh.est,allIn};
       let bestScore=0; // Track the best financial score across strategies
 
-      // ── Manual-review triggers (V6f) ──
-      // Auction/REO list prices are unreliable, and comp-derived ARVs far above list
-      // are almost always bad comps. Flag these for manual review instead of auto-grading.
+      // ── Manual-review triggers ──
+      // Auction/REO list prices are unreliable; zip-comp ARVs far above list are usually bad comps.
       const _txt=((li.remarks||"")+" "+(li.listTerms||"")).toLowerCase();
       const isAuction=/\bauction\b|sheriff'?s?\s*sale|trustee'?s?\s*sale|auction\.com|absolute auction|highest bidder|online bidding|\breo\b|bank[\s-]?owned/.test(_txt);
-      const arvOutlier=arvSrc!=="avm"&&arv>0&&li.price>0&&arv>li.price*2.5;
+      const arvOutlier=arvSrc==="zip"&&arv>0&&li.price>0&&arv>li.price*2.5; // only guard comp-derived ARVs
       let reviewReason="";
       if(isAuction)reviewReason="Auction / REO — list price unreliable; verify before sending";
       else if(arvOutlier)reviewReason="ARV outlier ("+(arv/li.price).toFixed(1)+"× list) — verify comps";
+      else if(mfClassConflict)reviewReason="Multifamily class unclear (newer build, low condition) — verify before grading";
 
       // ── FLIP MATH ──
       if(strat.includes("flip")||strat==="any"){
@@ -213,14 +254,14 @@ function matchAll(listings,contacts,compData,sent){
       // ── HOLD / CASH FLOW MATH ──
       if(strat.includes("hold")||strat.includes("section")||strat.includes("house hack")||strat.includes("rental")||strat.includes("multi")||strat==="any"){
         if(rent>0&&li.price>0&&!isAuction){
-          const loanAmt=li.price*0.8;
+          const loanAmt=allIn*0.8;
           const monthlyPI=loanAmt>0?(loanAmt*(0.07/12)*Math.pow(1+0.07/12,360))/(Math.pow(1+0.07/12,360)-1):0;
           const monthlyTax=li.tax>0?li.tax/12:li.price*0.025/12;
           const ins=li.insurance>0?li.insurance/12:80;
           const vac=rent*0.08;const maint=rent*0.10;
           const totalExp=monthlyPI+monthlyTax+ins+vac+maint;
           const cf=rent-totalExp;
-          const capRate=li.price>0?((rent*12-li.tax-(ins*12)-(vac*12)-(maint*12))/li.price)*100:0;
+          const capRate=allIn>0?((rent*12-li.tax-(ins*12)-(vac*12)-(maint*12))/allIn)*100:0;
           sc.hRent=rent;sc.hPI=Math.round(monthlyPI);sc.hTax=Math.round(monthlyTax);sc.hExp=Math.round(totalExp);sc.hCF=Math.round(cf);sc.hCap=capRate.toFixed(1);
           if(cf>=300){sigs.push({l:"Cash flow: "+$f(Math.round(cf))+"/mo ("+capRate.toFixed(1)+"% cap)",w:3.5,t:"hold"});bestScore=Math.max(bestScore,3.5);}
           else if(cf>=150){sigs.push({l:"Cash flow: "+$f(Math.round(cf))+"/mo",w:2,t:"hold"});bestScore=Math.max(bestScore,2);}
@@ -256,6 +297,9 @@ function matchAll(listings,contacts,compData,sent){
       if(bestScore>=3.5||(bestScore>=3&&bonusW>=1))grade="A";
       else if(bestScore>=2||(bestScore>=1.5&&bonusW>=1.5))grade="B";
       else if(bestScore>=1)grade="C";
+
+      // Confidence gate: multifamily graded on ESTIMATED rent can't reach Grade A (needs actual reported rent)
+      if(isMF&&!rentActual&&grade==="A")grade="B";
 
       // No financial signals at all = skip
       if(sigs.length===0&&bonus.length===0)return;
@@ -506,7 +550,7 @@ function DealScreener(){
                       </div>
                       {/* Valuation */}
                       {m.arv>0&&<div style={{fontSize:12,fontFamily:FS,color:C.blu,marginTop:6}}>
-                        Est. Value: {$f(m.arv)}{m.sc.arvSrc==="avm"?" (AVM)":m.sc.arvSrc==="zip"?" (zip comps)":m.sc.arvSrc==="county"?" (county comps)":""} · Rehab: {$f(m.sc.rehabLow)}–{$f(m.sc.rehabHigh)} (est {$f(m.sc.rehab)}) · All-in: {$f(m.sc.allIn)}
+                        Est. Value: {$f(m.arv)}{m.sc.arvSrc==="avm"?" (AVM)":m.sc.arvSrc==="zip"?" (zip comps)":m.sc.arvSrc==="income"?" (income)":m.sc.arvSrc==="income-est"?" (income, est. rent)":""} · Rehab: {$f(m.sc.rehabLow)}–{$f(m.sc.rehabHigh)} (est {$f(m.sc.rehab)}){m.sc.rehabEst?" · sqft est.":""} · All-in: {$f(m.sc.allIn)}
                       </div>}
                       {/* Financial Scorecards */}
                       <div style={{marginTop:6,padding:"8px 10px",background:C.off,borderRadius:3,fontSize:12,fontFamily:FS}}>
